@@ -133,39 +133,36 @@ class VmManager(private val context: Context) {
     private fun buildQemuCommand(
         qemuBin: String, baseImage: String, userImage: String,
         vcpu: Int, ramMb: Int
-    ): List<String> {
-        val cmd = mutableListOf<String>()
-        cmd += qemuBin
+    ): List<String> = buildList {
+        add(qemuBin)
 
         if (isArm64()) {
-            cmd += listOf("-machine", "virt")
-            cmd += listOf("-cpu", "cortex-a53")
+            add("-machine"); add("virt")
+            add("-cpu"); add("cortex-a53")
         } else {
-            cmd += listOf("-machine", "q35")
-            cmd += listOf("-cpu", "qemu64")
+            add("-machine"); add("q35")
+            add("-cpu"); add("qemu64")
         }
 
-        cmd += listOf("-smp", vcpu.toString())
-        cmd += listOf("-m", ramMb.toString())
-        cmd += listOf("-drive", "if=none,file=$baseImage,id=base,format=qcow2,readonly=on")
-        cmd += listOf("-drive", "if=none,file=$userImage,id=user,format=qcow2")
-        cmd += listOf("-device", "virtio-blk-pci,drive=user")
+        add("-smp"); add(vcpu.toString())
+        add("-m"); add(ramMb.toString())
+        add("-drive"); add("if=none,file=$baseImage,id=base,format=qcow2,readonly=on")
+        add("-drive"); add("if=none,file=$userImage,id=user,format=qcow2")
+        add("-device"); add("virtio-blk-pci,drive=user")
         // SSH forward only: host 2222 → guest 22
-        cmd += listOf("-netdev", "user,id=net0,hostfwd=tcp::2222-:22")
-        cmd += listOf("-device", "virtio-net-pci,netdev=net0,romfile=")
-        cmd += listOf("-display", "none")
-        cmd += listOf("-serial", "stdio")
+        add("-netdev"); add("user,id=net0,hostfwd=tcp::2222-:22")
+        add("-device"); add("virtio-net-pci,netdev=net0,romfile=")
+        add("-display"); add("none")
+        add("-serial"); add("stdio")
 
         val kernel = File(vmDir, "vmlinuz-virt")
-        val initrd  = File(vmDir, "initramfs-virt")
+        val initrd = File(vmDir, "initramfs-virt")
         if (kernel.exists() && initrd.exists()) {
-            cmd += listOf("-kernel", kernel.absolutePath)
-            cmd += listOf("-initrd", initrd.absolutePath)
-            cmd += listOf("-append",
-                "console=ttyAMA0 root=/dev/vda rootfstype=ext4 rootflags=rw " +
-                "modules=virtio_blk,ext4 quiet")
+            add("-kernel"); add(kernel.absolutePath)
+            add("-initrd"); add(initrd.absolutePath)
+            add("-append")
+            add("console=ttyAMA0 root=/dev/vda rootfstype=ext4 rootflags=rw modules=virtio_blk,ext4 quiet")
         }
-        return cmd
     }
 
     // -------------------------------------------------------------------------
