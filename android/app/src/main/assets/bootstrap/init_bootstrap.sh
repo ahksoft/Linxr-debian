@@ -1,15 +1,15 @@
 #!/bin/sh
 # Alpine VM bootstrap — runs on first boot inside the QEMU VM.
 # Sets up root SSH access and installs essential packages.
-# Connect via:  ssh root@localhost -p 2222   (password: alpine)
+# Connect via:  ssh root@localhost -p 2222   (default password: alpine)
 
 echo "=== Alpine VM Bootstrap Starting ==="
 
 # ---------------------------------------------------------------------------
-# Set root password
+# Set root password (initial default)
 # ---------------------------------------------------------------------------
 echo "root:alpine" | chpasswd 2>/dev/null || true
-echo "Root password set to: alpine"
+echo "Initial root password set to: alpine"
 
 # ---------------------------------------------------------------------------
 # Install and configure OpenSSH
@@ -58,7 +58,7 @@ sleep 1
 if pgrep sshd >/dev/null 2>&1; then
     echo "=== SSH is ready on port 22 ==="
     echo "=== Connect: ssh root@localhost -p 2222 ==="
-    echo "=== Password: alpine ==="
+    echo "=== Initial Default Password: alpine ==="
 else
     echo "ERROR: sshd failed to start"
     exit 1

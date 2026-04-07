@@ -26,8 +26,8 @@ class _Tab {
   static const _maxRetries = 24; // ~2 minutes
 
   _Tab(this.label)
-      : terminal = Terminal(maxLines: 5000),
-        controller = TerminalController();
+    : terminal = Terminal(maxLines: 5000),
+      controller = TerminalController();
 
   void close() {
     retryTimer?.cancel();
@@ -106,25 +106,33 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
   void _scheduleConnect(_Tab tab, {int delaySeconds = 0}) {
     tab.retryTimer?.cancel();
-    tab.retryTimer =
-        Timer(Duration(seconds: delaySeconds), () => _connect(tab));
+    tab.retryTimer = Timer(
+      Duration(seconds: delaySeconds),
+      () => _connect(tab),
+    );
   }
 
   Future<void> _connect(_Tab tab) async {
     if (tab.connState == _ConnState.connecting ||
-        tab.connState == _ConnState.connected) return;
+        tab.connState == _ConnState.connected)
+      return;
 
     setState(() => tab.connState = _ConnState.connecting);
     tab.terminal.write('\r\nConnecting to Linxr...\r\n');
 
     try {
-      final socket = await SSHSocket.connect('127.0.0.1', 2222)
-          .timeout(const Duration(seconds: 10));
+      final socket = await SSHSocket.connect(
+        '127.0.0.1',
+        2222,
+      ).timeout(const Duration(seconds: 10));
+
+      if (!mounted) return;
+      final password = context.read<VmState>().sshPassword;
 
       tab.client = SSHClient(
         socket,
         username: 'root',
-        onPasswordRequest: () => 'alpine',
+        onPasswordRequest: () => password,
       );
 
       tab.session = await tab.client!.shell(
@@ -153,8 +161,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
       tab.retryCount = 0;
       if (mounted) setState(() => tab.connState = _ConnState.connected);
     } on TimeoutException {
-      _retryOrError(tab,
-          'Timed out (${tab.retryCount + 1}/${_Tab._maxRetries})');
+      _retryOrError(
+        tab,
+        'Timed out (${tab.retryCount + 1}/${_Tab._maxRetries})',
+      );
     } catch (e) {
       _retryOrError(tab, 'Failed: $e');
     }
@@ -242,8 +252,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
               message: 'Not connected.',
               action: TextButton(
                 onPressed: () => _connect(_active),
-                child: const Text('Connect',
-                    style: TextStyle(color: Colors.white)),
+                child: const Text(
+                  'Connect',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ),
           Expanded(
@@ -301,15 +313,17 @@ class _TabBar extends StatelessWidget {
                 final active = i == activeIndex;
                 final tab = tabs[i];
                 final dotColor = switch (tab.connState) {
-                  _ConnState.connected  => const Color(0xFF20C997),
+                  _ConnState.connected => const Color(0xFF20C997),
                   _ConnState.connecting => const Color(0xFFFFC107),
-                  _ConnState.idle       => Colors.white24,
+                  _ConnState.idle => Colors.white24,
                 };
                 return GestureDetector(
                   onTap: () => onSelect(i),
                   child: Container(
-                    constraints:
-                        const BoxConstraints(minWidth: 80, maxWidth: 130),
+                    constraints: const BoxConstraints(
+                      minWidth: 80,
+                      maxWidth: 130,
+                    ),
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     decoration: BoxDecoration(
                       color: active
@@ -332,7 +346,9 @@ class _TabBar extends StatelessWidget {
                           height: 6,
                           margin: const EdgeInsets.only(right: 6),
                           decoration: BoxDecoration(
-                              shape: BoxShape.circle, color: dotColor),
+                            shape: BoxShape.circle,
+                            color: dotColor,
+                          ),
                         ),
                         Flexible(
                           child: Text(
@@ -352,9 +368,7 @@ class _TabBar extends StatelessWidget {
                               child: Icon(
                                 Icons.close,
                                 size: 13,
-                                color: active
-                                    ? Colors.white60
-                                    : Colors.white24,
+                                color: active ? Colors.white60 : Colors.white24,
                               ),
                             ),
                           ),
@@ -389,9 +403,9 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (state) {
-      _ConnState.connected  => ('Connected', const Color(0xFF20C997)),
+      _ConnState.connected => ('Connected', const Color(0xFF20C997)),
       _ConnState.connecting => ('Connecting...', const Color(0xFFFFC107)),
-      _ConnState.idle       => ('Disconnected', Colors.white38),
+      _ConnState.idle => ('Disconnected', Colors.white38),
     };
     return Chip(
       label: Text(label, style: TextStyle(color: color, fontSize: 11)),
@@ -404,11 +418,12 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _Banner extends StatelessWidget {
-  const _Banner(
-      {required this.icon,
-      required this.color,
-      required this.message,
-      this.action});
+  const _Banner({
+    required this.icon,
+    required this.color,
+    required this.message,
+    this.action,
+  });
   final IconData icon;
   final Color color;
   final String message;
@@ -424,8 +439,8 @@ class _Banner extends StatelessWidget {
           Icon(icon, color: color, size: 16),
           const SizedBox(width: 8),
           Expanded(
-              child: Text(message,
-                  style: TextStyle(color: color, fontSize: 13))),
+            child: Text(message, style: TextStyle(color: color, fontSize: 13)),
+          ),
           if (action != null) action!,
         ],
       ),

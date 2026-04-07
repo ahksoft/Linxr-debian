@@ -6,10 +6,7 @@ import 'services/vm_platform.dart';
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => VmState(),
-      child: const AlpineApp(),
-    ),
+    ChangeNotifierProvider(create: (_) => VmState(), child: const AlpineApp()),
   );
 }
 
@@ -80,10 +77,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (i) => setState(() => _selectedIndex = i),
@@ -133,10 +127,14 @@ class _StatusCard extends StatelessWidget {
     final vm = context.watch<VmState>();
 
     final (label, color, icon) = switch (vm.status) {
-      'running'  => ('Running', const Color(0xFF20C997), Icons.check_circle),
-      'starting' => ('Starting...', const Color(0xFFFFC107), Icons.hourglass_top),
-      'error'    => ('Error', const Color(0xFFDC3545), Icons.error),
-      _          => ('Stopped', Colors.white38, Icons.stop_circle_outlined),
+      'running' => ('Running', const Color(0xFF20C997), Icons.check_circle),
+      'starting' => (
+        'Starting...',
+        const Color(0xFFFFC107),
+        Icons.hourglass_top,
+      ),
+      'error' => ('Error', const Color(0xFFDC3545), Icons.error),
+      _ => ('Stopped', Colors.white38, Icons.stop_circle_outlined),
     };
 
     return Card(
@@ -150,20 +148,27 @@ class _StatusCard extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Alpine Linux VM',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(color: Colors.white)),
+                Text(
+                  'Alpine Linux VM',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(color: Colors.white),
+                ),
                 const SizedBox(height: 4),
-                Text(label,
-                    style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+                Text(
+                  label,
+                  style: TextStyle(color: color, fontWeight: FontWeight.bold),
+                ),
                 if (vm.errorMessage != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text(vm.errorMessage!,
-                        style: const TextStyle(
-                            color: Color(0xFFDC3545), fontSize: 12)),
+                    child: Text(
+                      vm.errorMessage!,
+                      style: const TextStyle(
+                        color: Color(0xFFDC3545),
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -179,7 +184,8 @@ class _SshInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isRunning = context.watch<VmState>().isRunning;
+    final vm = context.watch<VmState>();
+    final isRunning = vm.isRunning;
 
     return Card(
       color: const Color(0xFF1A1D23),
@@ -192,14 +198,23 @@ class _SshInfoCard extends StatelessWidget {
               children: [
                 const Icon(Icons.terminal, color: Color(0xFF0D6EFD), size: 20),
                 const SizedBox(width: 8),
-                Text('Shell Access',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleSmall
-                        ?.copyWith(color: Colors.white)),
+                Expanded(
+                  child: Text(
+                    'Shell Access',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleSmall?.copyWith(color: Colors.white),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 18),
+                  tooltip: 'Change Password',
+                  onPressed: () => _showPasswordDialog(context),
+                  visualDensity: VisualDensity.compact,
+                ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
             const Text(
               'Use the Terminal tab for a built-in shell.\n'
               'External SSH clients can also connect:',
@@ -207,13 +222,14 @@ class _SshInfoCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Container(
+              width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Colors.black38,
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                'ssh root@localhost -p 2222  # password: alpine',
+                'ssh root@localhost -p 2222  # password: ${vm.sshPassword}',
                 style: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 12,
@@ -223,6 +239,54 @@ class _SshInfoCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showPasswordDialog(BuildContext context) {
+    final controller = TextEditingController(
+      text: context.read<VmState>().sshPassword,
+    );
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change SSH Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Set the password for the built-in terminal. Note: You must also change it inside the VM using the "passwd" command.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'SSH Password',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              context.read<VmState>().setSshPassword(controller.text);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('SSH Password updated in app.')),
+              );
+            },
+            child: const Text('Save'),
+          ),
+        ],
       ),
     );
   }

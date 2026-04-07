@@ -27,6 +27,7 @@ class VmState extends ChangeNotifier {
   String _status = 'stopped';
   bool _isLoading = false;
   String? _errorMessage;
+  String _sshPassword = 'alpine';
 
   Timer? _pollTimer;
 
@@ -34,6 +35,12 @@ class VmState extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isRunning => _status == 'running';
+  String get sshPassword => _sshPassword;
+
+  void setSshPassword(String newPassword) {
+    _sshPassword = newPassword;
+    notifyListeners();
+  }
 
   Future<void> startVm() async {
     if (_status == 'running' || _status == 'starting') return;

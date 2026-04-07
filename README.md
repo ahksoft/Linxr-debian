@@ -46,13 +46,13 @@ Linxr runs a full Alpine Linux environment inside a QEMU virtual machine on any 
 2. Open **Linxr** → tap **Start VM**
 3. Wait ~15 seconds for Alpine to boot
 4. Switch to the **Terminal** tab — it auto-connects
-5. Log in as `root` / `alpine`
+5. Log in as `root` (default password: `alpine`)
 
 ### External SSH (optional)
 
 ```bash
 ssh root@localhost -p 2222
-# password: alpine
+# default password: alpine
 ```
 
 ---
@@ -130,9 +130,9 @@ adb install build/linxr-debug.apk
 | Field | Value |
 |---|---|
 | Username | `root` |
-| Password | `alpine` |
+| Password | `alpine` (initial) |
 
-> Change the root password with `passwd` after first login.
+> **Security Note:** Change the root password with `passwd` after first login, and update it in the Linxr app settings (Home → Shell Access → Edit).
 
 ---
 

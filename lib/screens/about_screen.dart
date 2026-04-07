@@ -41,10 +41,7 @@ class _CompanyBranding extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           'ai2th.github.io',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.white.withOpacity(0.35),
-          ),
+          style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.35)),
         ),
       ],
     );
@@ -90,7 +87,10 @@ class _AppInfoCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF0D6EFD).withOpacity(0.15),
                       borderRadius: BorderRadius.circular(4),
@@ -111,14 +111,22 @@ class _AppInfoCard extends StatelessWidget {
                   const Text(
                     'Bare Alpine Linux VM on Android — no root required. '
                     'Run a full Linux environment powered by QEMU.',
-                    style: TextStyle(color: Colors.white60, fontSize: 13, height: 1.4),
+                    style: TextStyle(
+                      color: Colors.white60,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   _InfoRow(Icons.business, 'Developer', 'AI2TH'),
                   const SizedBox(height: 4),
                   _InfoRow(Icons.memory, 'VM RAM', '1024 MB'),
                   const SizedBox(height: 4),
-                  _InfoRow(Icons.terminal, 'SSH', 'root@localhost:2222  ·  pw: alpine'),
+                  _InfoRow(
+                    Icons.terminal,
+                    'SSH',
+                    'root@localhost:2222  ·  default pw: alpine',
+                  ),
                 ],
               ),
             ),
@@ -142,7 +150,10 @@ class _InfoRow extends StatelessWidget {
       children: [
         Icon(icon, size: 13, color: Colors.white38),
         const SizedBox(width: 6),
-        Text('$label: ', style: const TextStyle(color: Colors.white38, fontSize: 12)),
+        Text(
+          '$label: ',
+          style: const TextStyle(color: Colors.white38, fontSize: 12),
+        ),
         Expanded(
           child: Text(
             value,
@@ -177,10 +188,14 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           leading: const Icon(Icons.gavel, color: Color(0xFF20C997), size: 20),
-          title: const Text('License',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-          subtitle: const Text('MIT License — Open Source',
-              style: TextStyle(color: Colors.white38, fontSize: 12)),
+          title: const Text(
+            'License',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+          subtitle: const Text(
+            'MIT License — Open Source',
+            style: TextStyle(color: Colors.white38, fontSize: 12),
+          ),
           iconColor: Colors.white38,
           collapsedIconColor: Colors.white38,
           children: [
@@ -216,22 +231,39 @@ class _DependenciesCard extends StatelessWidget {
   const _DependenciesCard();
 
   static const _deps = [
-    _Dep('Flutter', 'Google', 'BSD-3-Clause',
-        'Cross-platform UI toolkit'),
-    _Dep('dartssh2', 'Xclusive Dartssh2 Authors', 'MIT',
-        'Pure-Dart SSH2 client & server'),
-    _Dep('xterm', 'TerminalStudio', 'BSD-3-Clause',
-        'Terminal emulator widget for Flutter'),
-    _Dep('provider', 'Remi Rousselet', 'MIT',
-        'State management wrapper for InheritedWidget'),
-    _Dep('cupertino_icons', 'Flutter Team', 'MIT',
-        'iOS-style icon assets'),
-    _Dep('QEMU', 'QEMU Project', 'GPL-2.0',
-        'Machine emulator and virtualiser'),
-    _Dep('Alpine Linux', 'Alpine Linux Developers', 'MIT / GPL',
-        'Security-oriented, lightweight Linux distribution'),
-    _Dep('OpenSSH', 'OpenBSD Project', 'BSD',
-        'Connectivity tools for remote login with SSH protocol'),
+    _Dep('Flutter', 'Google', 'BSD-3-Clause', 'Cross-platform UI toolkit'),
+    _Dep(
+      'dartssh2',
+      'Xclusive Dartssh2 Authors',
+      'MIT',
+      'Pure-Dart SSH2 client & server',
+    ),
+    _Dep(
+      'xterm',
+      'TerminalStudio',
+      'BSD-3-Clause',
+      'Terminal emulator widget for Flutter',
+    ),
+    _Dep(
+      'provider',
+      'Remi Rousselet',
+      'MIT',
+      'State management wrapper for InheritedWidget',
+    ),
+    _Dep('cupertino_icons', 'Flutter Team', 'MIT', 'iOS-style icon assets'),
+    _Dep('QEMU', 'QEMU Project', 'GPL-2.0', 'Machine emulator and virtualiser'),
+    _Dep(
+      'Alpine Linux',
+      'Alpine Linux Developers',
+      'MIT / GPL',
+      'Security-oriented, lightweight Linux distribution',
+    ),
+    _Dep(
+      'OpenSSH',
+      'OpenBSD Project',
+      'BSD',
+      'Connectivity tools for remote login with SSH protocol',
+    ),
   ];
 
   @override
@@ -241,17 +273,23 @@ class _DependenciesCard extends StatelessWidget {
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          leading: const Icon(Icons.account_tree_outlined,
-              color: Color(0xFF0D6EFD), size: 20),
-          title: const Text('Open Source Components',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-          subtitle: Text('${_deps.length} components',
-              style: const TextStyle(color: Colors.white38, fontSize: 12)),
+          leading: const Icon(
+            Icons.account_tree_outlined,
+            color: Color(0xFF0D6EFD),
+            size: 20,
+          ),
+          title: const Text(
+            'Open Source Components',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(
+            '${_deps.length} components',
+            style: const TextStyle(color: Colors.white38, fontSize: 12),
+          ),
           iconColor: Colors.white38,
           collapsedIconColor: Colors.white38,
           children: [
-            for (final d in _deps)
-              _DepTile(dep: d),
+            for (final d in _deps) _DepTile(dep: d),
             const SizedBox(height: 8),
           ],
         ),
@@ -285,12 +323,16 @@ class _DepTile extends StatelessWidget {
               color: const Color(0xFF20C997).withOpacity(0.12),
               borderRadius: BorderRadius.circular(4),
               border: Border.all(
-                  color: const Color(0xFF20C997).withOpacity(0.3)),
+                color: const Color(0xFF20C997).withOpacity(0.3),
+              ),
             ),
             child: Text(
               dep.license,
               style: const TextStyle(
-                  fontSize: 9, color: Color(0xFF20C997), fontWeight: FontWeight.w600),
+                fontSize: 9,
+                color: Color(0xFF20C997),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           const SizedBox(width: 10),
@@ -298,13 +340,26 @@ class _DepTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(dep.name,
-                    style: const TextStyle(
-                        color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
-                Text(dep.author,
-                    style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                Text(dep.desc,
-                    style: const TextStyle(color: Colors.white54, fontSize: 11, height: 1.3)),
+                Text(
+                  dep.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  dep.author,
+                  style: const TextStyle(color: Colors.white38, fontSize: 11),
+                ),
+                Text(
+                  dep.desc,
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 11,
+                    height: 1.3,
+                  ),
+                ),
               ],
             ),
           ),
