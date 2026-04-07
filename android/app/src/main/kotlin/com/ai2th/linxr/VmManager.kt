@@ -113,14 +113,14 @@ class VmManager(private val context: Context) {
     }
 
     fun getStatus(): String {
-        vmProcess?.let {
-            return try {
-                it.exitValue()
+        val proc = vmProcess
+        if (proc != null) {
+            if (proc.isAlive) {
+                return "running"
+            } else {
                 isRunning = false
                 vmProcess = null
-                "stopped"
-            } catch (_: IllegalThreadStateException) {
-                "running"
+                return "stopped"
             }
         }
         return "stopped"
