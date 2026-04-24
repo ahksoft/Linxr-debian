@@ -31,6 +31,7 @@ android/app/src/main/assets/vm/vmlinuz-virt
 *.iml
 .vscode/
 
-# Docker build cache
-docker/
+# Docker build cache artifacts (but keep Dockerfiles)
+docker/*.tar
+docker/*.img
 guest/

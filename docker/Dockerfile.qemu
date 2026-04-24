@@ -1,0 +1,98 @@
+# Cross-compile qemu-system-aarch64 and qemu-img for Android arm64
+# Output: /out/libqemu.so and /out/libqemu_img.so
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV NDK_VERSION=r27c
+ENV QEMU_VERSION=8.2.2
+ENV API=26
+ENV ABI=arm64-v8a
+ENV TRIPLE=aarch64-linux-android
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential ninja-build pkg-config python3 python3-pip \
+    libglib2.0-dev libpixman-1-dev flex bison \
+    curl unzip git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Android NDK
+RUN curl -fsSL "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip" \
+      -o /tmp/ndk.zip && \
+    unzip -q /tmp/ndk.zip -d /opt && \
+    rm /tmp/ndk.zip
+ENV NDK=/opt/android-ndk-${NDK_VERSION}
+ENV TOOLCHAIN=${NDK}/toolchains/llvm/prebuilt/linux-x86_64
+ENV PATH="${TOOLCHAIN}/bin:${PATH}"
+
+# QEMU source
+RUN curl -fsSL "https://download.qemu.org/qemu-${QEMU_VERSION}.tar.xz" | \
+    tar -xJ -C /tmp
+
+WORKDIR /tmp/qemu-${QEMU_VERSION}
+
+# Cross-compile flags for Android
+ENV CC="${TRIPLE}${API}-clang"
+ENV CXX="${TRIPLE}${API}-clang++"
+ENV AR="${TOOLCHAIN}/bin/llvm-ar"
+ENV STRIP="${TOOLCHAIN}/bin/llvm-strip"
+ENV PKG_CONFIG_LIBDIR=""
+
+# Build qemu-system-aarch64
+RUN mkdir -p /build/qemu-system && cd /build/qemu-system && \
+    /tmp/qemu-${QEMU_VERSION}/configure \
+      --cross-prefix="${TRIPLE}${API}-" \
+      --cc="${CC}" \
+      --cxx="${CXX}" \
+      --host-cc=gcc \
+      --target-list=aarch64-softmmu \
+      --static \
+      --disable-werror \
+      --disable-docs \
+      --disable-gtk \
+      --disable-sdl \
+      --disable-opengl \
+      --disable-virglrenderer \
+      --disable-vte \
+      --disable-brlapi \
+      --disable-curses \
+      --disable-vnc \
+      --disable-spice \
+      --disable-libusb \
+      --disable-usb-redir \
+      --disable-smartcard \
+      --disable-libnfs \
+      --disable-libssh \
+      --disable-bochs \
+      --disable-cloop \
+      --disable-dmg \
+      --disable-qed \
+      --disable-parallels \
+      --disable-sheepdog \
+      --enable-slirp=internal \
+      --enable-virtfs=no \
+      --prefix=/out && \
+    make -j$(nproc) && \
+    cp qemu-system-aarch64 /out/libqemu.so
+
+# Build qemu-img
+RUN mkdir -p /build/qemu-img && cd /build/qemu-img && \
+    /tmp/qemu-${QEMU_VERSION}/configure \
+      --cross-prefix="${TRIPLE}${API}-" \
+      --cc="${CC}" \
+      --cxx="${CXX}" \
+      --host-cc=gcc \
+      --target-list="" \
+      --static \
+      --disable-werror \
+      --disable-docs \
+      --disable-system \
+      --disable-user \
+      --disable-gtk \
+      --disable-sdl \
+      --disable-vnc \
+      --disable-spice \
+      --prefix=/out && \
+    make -j$(nproc) qemu-img && \
+    cp qemu-img /out/libqemu_img.so
+
+RUN ls -lh /out/libqemu.so /out/libqemu_img.so

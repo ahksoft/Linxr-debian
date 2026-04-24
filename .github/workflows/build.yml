@@ -8,11 +8,44 @@ on:
   workflow_dispatch:
 
 jobs:
+  build-qemu:
+    name: Build QEMU binaries (Android arm64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache QEMU binaries
+        id: cache-qemu
+        uses: actions/cache@v4
+        with:
+          path: android/app/src/main/jniLibs/arm64-v8a
+          key: qemu-android-arm64-${{ hashFiles('docker/Dockerfile.qemu') }}
+
+      - name: Build QEMU for Android arm64
+        if: steps.cache-qemu.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p android/app/src/main/jniLibs/arm64-v8a
+          docker build \
+            -f docker/Dockerfile.qemu \
+            -t qemu-android-builder \
+            .
+          docker run --rm \
+            -v "$PWD/android/app/src/main/jniLibs/arm64-v8a:/out" \
+            qemu-android-builder \
+            sh -c "cp /out/libqemu.so /out/libqemu_img.so /out/ 2>/dev/null || true"
+
+      - name: Verify binaries
+        run: ls -lh android/app/src/main/jniLibs/arm64-v8a/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qemu-libs
+          path: android/app/src/main/jniLibs/arm64-v8a/
+          retention-days: 1
+
   build-qcow2:
     name: Build Alpine base image
     runs-on: ubuntu-latest
-    outputs:
-      cache-hit: ${{ steps.cache.outputs.cache-hit }}
     steps:
       - uses: actions/checkout@v4
 
@@ -38,8 +71,8 @@ jobs:
           OUTDIR="android/app/src/main/assets/vm"
           BASE_URL="https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/aarch64/netboot"
           mkdir -p "$OUTDIR"
-          curl -fsSL "$BASE_URL/vmlinuz-virt"    -o "$OUTDIR/vmlinuz-virt"
-          curl -fsSL "$BASE_URL/initramfs-virt"  -o "$OUTDIR/initramfs-virt"
+          curl -fsSL "$BASE_URL/vmlinuz-virt"   -o "$OUTDIR/vmlinuz-virt"
+          curl -fsSL "$BASE_URL/initramfs-virt" -o "$OUTDIR/initramfs-virt"
           ls -lh "$OUTDIR/"
 
       - uses: actions/upload-artifact@v4
@@ -54,7 +87,7 @@ jobs:
   build-apk:
     name: Build debug APK
     runs-on: ubuntu-latest
-    needs: build-qcow2
+    needs: [build-qemu, build-qcow2]
     steps:
       - uses: actions/checkout@v4
 
@@ -62,6 +95,16 @@ jobs:
         with:
           name: base-qcow2
           path: android/app/src/main/assets/vm/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: qemu-libs
+          path: android/app/src/main/jniLibs/arm64-v8a/
+
+      - name: Verify all assets
+        run: |
+          echo "=== VM assets ===" && ls -lh android/app/src/main/assets/vm/
+          echo "=== QEMU libs ===" && ls -lh android/app/src/main/jniLibs/arm64-v8a/
 
       - uses: actions/setup-java@v4
         with:
@@ -74,9 +117,8 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Prepare build dirs & debug keystore
+      - name: Generate debug keystore
         run: |
-          mkdir -p android/app/src/main/jniLibs
           keytool -genkeypair -v \
             -keystore android/app/debug.keystore \
             -alias debug -keyalg RSA -keysize 2048 -validity 10000 \
