@@ -29,7 +29,7 @@ class VmManager(private val context: Context) {
         get() = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
 
     // Bump when base.qcow2.gz changes (forces re-extraction on next launch)
-    private val ASSETS_VERSION = "v4"
+    private val ASSETS_VERSION = "v5"
 
     // -------------------------------------------------------------------------
     // Public API
@@ -147,9 +147,10 @@ class VmManager(private val context: Context) {
 
         cmd += listOf("-smp", vcpu.toString())
         cmd += listOf("-m", ramMb.toString())
-        cmd += listOf("-drive", "if=none,file=$baseImage,id=base,format=qcow2,readonly=on")
-        cmd += listOf("-drive", "if=none,file=$userImage,id=user,format=qcow2")
-        cmd += listOf("-device", "virtio-blk-pci,drive=user")
+        // user.qcow2 is a writable overlay with base.qcow2 as its backing file.
+        // Present it as a single virtio-blk disk — QEMU resolves the backing chain automatically.
+        cmd += listOf("-drive", "if=none,file=$userImage,id=hd0,format=qcow2")
+        cmd += listOf("-device", "virtio-blk-pci,drive=hd0")
         // SSH forward only: host 2222 → guest 22
         cmd += listOf("-netdev", "user,id=net0,hostfwd=tcp::2222-:22")
         cmd += listOf("-device", "virtio-net-pci,netdev=net0,romfile=")
@@ -162,7 +163,7 @@ class VmManager(private val context: Context) {
             cmd += listOf("-kernel", kernel.absolutePath)
             cmd += listOf("-initrd", initrd.absolutePath)
             cmd += listOf("-append",
-                "console=ttyAMA0 root=/dev/vda rootfstype=ext4 rootflags=rw " +
+                "console=ttyAMA0 root=/dev/vda rootfstype=ext4 rw " +
                 "modules=virtio_blk,ext4 quiet")
         }
         return cmd
