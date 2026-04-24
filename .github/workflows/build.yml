@@ -29,32 +29,21 @@ jobs:
           mkdir -p "$OUTDIR"
           BASE="https://packages.termux.dev/apt/termux-main"
 
-          # Resolve latest package filenames from index
           PKGS=$(curl -fsSL "$BASE/dists/stable/main/binary-aarch64/Packages")
           QEMU_DEB=$(echo "$PKGS" | grep -A15 "^Package: qemu-system-aarch64-headless" | grep "^Filename:" | head -1 | awk '{print $2}')
           QIMG_DEB=$(echo "$PKGS" | grep -A15 "^Package: qemu-utils" | grep "^Filename:" | head -1 | awk '{print $2}')
           echo "qemu-system: $QEMU_DEB"
           echo "qemu-utils:  $QIMG_DEB"
 
-          # Download and extract qemu-system-aarch64
           curl -fsSL "$BASE/$QEMU_DEB" -o /tmp/qemu-system.deb
-          mkdir -p /tmp/qemu-system-extract
-          cd /tmp/qemu-system-extract
-          ar x /tmp/qemu-system.deb
-          tar -xf data.tar.xz
-          QEMU_BIN=$(find . -name "qemu-system-aarch64" -type f | head -1)
-          echo "Found: $QEMU_BIN ($(du -sh $QEMU_BIN | cut -f1))"
-          cp "$QEMU_BIN" "$OUTDIR/libqemu.so"
+          mkdir -p /tmp/qemu-system-extract && cd /tmp/qemu-system-extract
+          ar x /tmp/qemu-system.deb && tar -xf data.tar.xz
+          cp "$(find . -name 'qemu-system-aarch64' -type f | head -1)" "$OUTDIR/libqemu.so"
 
-          # Download and extract qemu-img
           curl -fsSL "$BASE/$QIMG_DEB" -o /tmp/qemu-utils.deb
-          mkdir -p /tmp/qemu-utils-extract
-          cd /tmp/qemu-utils-extract
-          ar x /tmp/qemu-utils.deb
-          tar -xf data.tar.xz
-          QIMG_BIN=$(find . -name "qemu-img" -type f | head -1)
-          echo "Found: $QIMG_BIN ($(du -sh $QIMG_BIN | cut -f1))"
-          cp "$QIMG_BIN" "$OUTDIR/libqemu_img.so"
+          mkdir -p /tmp/qemu-utils-extract && cd /tmp/qemu-utils-extract
+          ar x /tmp/qemu-utils.deb && tar -xf data.tar.xz
+          cp "$(find . -name 'qemu-img' -type f | head -1)" "$OUTDIR/libqemu_img.so"
 
           ls -lh "$OUTDIR/"
 
@@ -162,3 +151,49 @@ jobs:
         with:
           name: linxr-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
+
+  smoke-test:
+    name: Smoke test (UI launch)
+    runs-on: ubuntu-latest
+    needs: build-apk
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: linxr-debug
+          path: build/
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | \
+            sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Run smoke test on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          disable-animations: true
+          script: |
+            adb install build/app-debug.apk
+            adb shell am start -n com.ahk.linxv/.MainActivity
+            sleep 10
+            adb shell screencap -p /sdcard/screen.png
+            adb pull /sdcard/screen.png screen.png
+            # Verify app didn't crash (process still running)
+            adb shell pidof com.ahk.linxv && echo "✅ APP IS RUNNING" || (echo "❌ APP CRASHED" && exit 1)
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-test-screenshot
+          path: screen.png
+          retention-days: 7
