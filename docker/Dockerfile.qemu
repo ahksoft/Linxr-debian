@@ -6,7 +6,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV NDK_VERSION=r27c
 ENV QEMU_VERSION=8.2.2
 ENV API=26
-ENV ABI=arm64-v8a
 ENV TRIPLE=aarch64-linux-android
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -30,14 +29,10 @@ RUN curl -fsSL "https://download.qemu.org/qemu-${QEMU_VERSION}.tar.xz" | \
 
 WORKDIR /tmp/qemu-${QEMU_VERSION}
 
-# Cross-compile flags for Android
 ENV CC="${TRIPLE}${API}-clang"
 ENV CXX="${TRIPLE}${API}-clang++"
-ENV AR="${TOOLCHAIN}/bin/llvm-ar"
-ENV STRIP="${TOOLCHAIN}/bin/llvm-strip"
-ENV PKG_CONFIG_LIBDIR=""
 
-# Build qemu-system-aarch64
+# Build qemu-system-aarch64 (static, minimal, with SLIRP networking)
 RUN mkdir -p /build/qemu-system && cd /build/qemu-system && \
     /tmp/qemu-${QEMU_VERSION}/configure \
       --cross-prefix="${TRIPLE}${API}-" \
@@ -62,17 +57,12 @@ RUN mkdir -p /build/qemu-system && cd /build/qemu-system && \
       --disable-smartcard \
       --disable-libnfs \
       --disable-libssh \
-      --disable-bochs \
-      --disable-cloop \
-      --disable-dmg \
-      --disable-qed \
-      --disable-parallels \
-      --enable-slirp=internal \
+      --enable-slirp \
       --prefix=/out && \
     make -j$(nproc) && \
     cp qemu-system-aarch64 /out/libqemu.so
 
-# Build qemu-img
+# Build qemu-img (static)
 RUN mkdir -p /build/qemu-img && cd /build/qemu-img && \
     /tmp/qemu-${QEMU_VERSION}/configure \
       --cross-prefix="${TRIPLE}${API}-" \

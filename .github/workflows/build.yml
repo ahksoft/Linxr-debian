@@ -27,12 +27,8 @@ jobs:
           mkdir -p android/app/src/main/jniLibs/arm64-v8a
           docker build \
             -f docker/Dockerfile.qemu \
-            -t qemu-android-builder \
+            --output type=local,dest=android/app/src/main/jniLibs/arm64-v8a \
             .
-          docker run --rm \
-            -v "$PWD/android/app/src/main/jniLibs/arm64-v8a:/out" \
-            qemu-android-builder \
-            sh -c "cp /out/libqemu.so /out/libqemu_img.so /out/ 2>/dev/null || true"
 
       - name: Verify binaries
         run: ls -lh android/app/src/main/jniLibs/arm64-v8a/
