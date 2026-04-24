@@ -165,7 +165,7 @@ class VmManager(private val context: Context) {
             cmd += listOf("-initrd", initrd.absolutePath)
             cmd += listOf("-append",
                 "console=ttyAMA0 root=/dev/vda rootfstype=ext4 rw " +
-                "modules=virtio_blk,ext4 quiet")
+                "systemd.unit=multi-user.target quiet")
         }
         return cmd
     }

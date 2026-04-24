@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-qcow2:
-    name: Build Alpine base image
+    name: Build Debian base image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +19,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: android/app/src/main/assets/vm/base.qcow2.gz
-          key: qcow2-${{ hashFiles('scripts/_build_rootfs.sh') }}
+          key: qcow2-debian-${{ hashFiles('scripts/_build_debian_rootfs.sh') }}
 
       - name: Set up QEMU (for ARM64 emulation)
         if: steps.cache.outputs.cache-hit != 'true'
@@ -29,15 +29,21 @@ jobs:
 
       - name: Build base.qcow2.gz
         if: steps.cache.outputs.cache-hit != 'true'
-        run: bash scripts/build_qcow2.sh
+        run: |
+          mkdir -p android/app/src/main/assets/vm
+          docker run --rm --privileged \
+            -v $(pwd)/android/app/src/main/assets/vm:/out \
+            --platform linux/arm64 \
+            debian:bookworm \
+            bash -c "
+              apt-get update && apt-get install -y debootstrap qemu-user-static e2fsprogs qemu-utils binfmt-support
+              $(cat scripts/_build_debian_rootfs.sh | tail -n +3)
+            "
 
       - uses: actions/upload-artifact@v4
         with:
           name: base-qcow2
-          path: |
-            android/app/src/main/assets/vm/base.qcow2.gz
-            android/app/src/main/assets/vm/vmlinuz-virt
-            android/app/src/main/assets/vm/initramfs-virt
+          path: android/app/src/main/assets/vm/base.qcow2.gz
           retention-days: 1
 
   build-apk:
