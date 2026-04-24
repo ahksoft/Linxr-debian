@@ -94,7 +94,18 @@ jobs:
       - name: Build debug APK
         run: flutter build apk --debug
 
+      - name: Recompress APK
+        run: |
+          cd build/app/outputs/flutter-apk/
+          mv app-debug.apk app-debug-orig.apk
+          unzip -q app-debug-orig.apk -d apk-contents
+          cd apk-contents
+          zip -r9 ../app-debug.apk . -x "*.kotlin_module"
+          cd ..
+          echo "Original: $(du -sh app-debug-orig.apk | cut -f1)  Compressed: $(du -sh app-debug.apk | cut -f1)"
+
       - uses: actions/upload-artifact@v4
         with:
           name: linxr-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
+          compression-level: 9
