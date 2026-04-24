@@ -23,6 +23,12 @@ jobs:
           path: android/app/src/main/assets/vm/base.qcow2.gz
           key: qcow2-${{ hashFiles('scripts/_build_rootfs.sh') }}
 
+      - name: Set up QEMU (for ARM64 emulation)
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
       - name: Build base.qcow2.gz
         if: steps.cache.outputs.cache-hit != 'true'
         run: bash scripts/build_qcow2.sh
