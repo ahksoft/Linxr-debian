@@ -19,26 +19,50 @@ RUN curl -fsSL "https://dl.google.com/android/repository/android-ndk-${NDK_VERSI
       -o /tmp/ndk.zip && \
     unzip -q /tmp/ndk.zip -d /opt && \
     rm /tmp/ndk.zip
+
 ENV NDK=/opt/android-ndk-${NDK_VERSION}
 ENV TOOLCHAIN=${NDK}/toolchains/llvm/prebuilt/linux-x86_64
 ENV PATH="${TOOLCHAIN}/bin:${PATH}"
+
+ENV CC="${TRIPLE}${API}-clang"
+ENV CXX="${TRIPLE}${API}-clang++"
+ENV AR="${TOOLCHAIN}/bin/llvm-ar"
+ENV RANLIB="${TOOLCHAIN}/bin/llvm-ranlib"
+ENV STRIP="${TOOLCHAIN}/bin/llvm-strip"
+ENV NM="${TOOLCHAIN}/bin/llvm-nm"
+ENV OBJCOPY="${TOOLCHAIN}/bin/llvm-objcopy"
 
 # QEMU source
 RUN curl -fsSL "https://download.qemu.org/qemu-${QEMU_VERSION}.tar.xz" | \
     tar -xJ -C /tmp
 
-WORKDIR /tmp/qemu-${QEMU_VERSION}
+# Meson cross-file for Android arm64
+RUN cat > /tmp/android-arm64.ini << 'EOF'
+[binaries]
+c = 'aarch64-linux-android26-clang'
+cpp = 'aarch64-linux-android26-clang++'
+ar = 'llvm-ar'
+ranlib = 'llvm-ranlib'
+strip = 'llvm-strip'
+nm = 'llvm-nm'
+objcopy = 'llvm-objcopy'
+pkgconfig = 'pkg-config'
 
-ENV CC="${TRIPLE}${API}-clang"
-ENV CXX="${TRIPLE}${API}-clang++"
+[host_machine]
+system = 'android'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'
+EOF
 
 # Build qemu-system-aarch64 (static, minimal, with SLIRP networking)
 RUN mkdir -p /build/qemu-system && cd /build/qemu-system && \
     /tmp/qemu-${QEMU_VERSION}/configure \
-      --cross-prefix="${TRIPLE}${API}-" \
+      --cross-prefix="" \
       --cc="${CC}" \
       --cxx="${CXX}" \
       --host-cc=gcc \
+      --cross-file=/tmp/android-arm64.ini \
       --target-list=aarch64-softmmu \
       --static \
       --disable-werror \
@@ -65,10 +89,11 @@ RUN mkdir -p /build/qemu-system && cd /build/qemu-system && \
 # Build qemu-img (static)
 RUN mkdir -p /build/qemu-img && cd /build/qemu-img && \
     /tmp/qemu-${QEMU_VERSION}/configure \
-      --cross-prefix="${TRIPLE}${API}-" \
+      --cross-prefix="" \
       --cc="${CC}" \
       --cxx="${CXX}" \
       --host-cc=gcc \
+      --cross-file=/tmp/android-arm64.ini \
       --target-list="" \
       --static \
       --disable-werror \
