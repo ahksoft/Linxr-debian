@@ -11,7 +11,6 @@
 pubspec.lock
 
 # Android
-android/app/src/main/jniLibs/
 android/local.properties
 android/.gradle/
 android/app/debug.keystore

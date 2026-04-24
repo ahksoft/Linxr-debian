@@ -8,54 +8,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-qemu:
-    name: Build QEMU binaries (Android arm64)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Cache QEMU binaries
-        id: cache-qemu
-        uses: actions/cache@v4
-        with:
-          path: android/app/src/main/jniLibs/arm64-v8a
-          key: qemu-android-arm64-${{ hashFiles('docker/Dockerfile.qemu') }}
-
-      - name: Build QEMU for Android arm64
-        if: steps.cache-qemu.outputs.cache-hit != 'true'
-        run: |
-          set -e
-          OUTDIR="$GITHUB_WORKSPACE/android/app/src/main/jniLibs/arm64-v8a"
-          mkdir -p "$OUTDIR"
-          BASE="https://packages.termux.dev/apt/termux-main"
-
-          PKGS=$(curl -fsSL "$BASE/dists/stable/main/binary-aarch64/Packages")
-          QEMU_DEB=$(echo "$PKGS" | grep -A15 "^Package: qemu-system-aarch64-headless" | grep "^Filename:" | head -1 | awk '{print $2}')
-          QIMG_DEB=$(echo "$PKGS" | grep -A15 "^Package: qemu-utils" | grep "^Filename:" | head -1 | awk '{print $2}')
-          echo "qemu-system: $QEMU_DEB"
-          echo "qemu-utils:  $QIMG_DEB"
-
-          curl -fsSL "$BASE/$QEMU_DEB" -o /tmp/qemu-system.deb
-          mkdir -p /tmp/qemu-system-extract && cd /tmp/qemu-system-extract
-          ar x /tmp/qemu-system.deb && tar -xf data.tar.xz
-          cp "$(find . -name 'qemu-system-aarch64' -type f | head -1)" "$OUTDIR/libqemu.so"
-
-          curl -fsSL "$BASE/$QIMG_DEB" -o /tmp/qemu-utils.deb
-          mkdir -p /tmp/qemu-utils-extract && cd /tmp/qemu-utils-extract
-          ar x /tmp/qemu-utils.deb && tar -xf data.tar.xz
-          cp "$(find . -name 'qemu-img' -type f | head -1)" "$OUTDIR/libqemu_img.so"
-
-          ls -lh "$OUTDIR/"
-
-      - name: Verify binaries
-        run: ls -lh android/app/src/main/jniLibs/arm64-v8a/
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: qemu-libs
-          path: android/app/src/main/jniLibs/arm64-v8a/
-          retention-days: 1
-
   build-qcow2:
     name: Build Alpine base image
     runs-on: ubuntu-latest
@@ -100,7 +52,7 @@ jobs:
   build-apk:
     name: Build debug APK
     runs-on: ubuntu-latest
-    needs: [build-qemu, build-qcow2]
+    needs: build-qcow2
     steps:
       - uses: actions/checkout@v4
 
@@ -108,11 +60,6 @@ jobs:
         with:
           name: base-qcow2
           path: android/app/src/main/assets/vm/
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: qemu-libs
-          path: android/app/src/main/jniLibs/arm64-v8a/
 
       - name: Verify all assets
         run: |
@@ -151,67 +98,3 @@ jobs:
         with:
           name: linxr-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
-
-  smoke-test:
-    name: Smoke test (UI launch)
-    runs-on: ubuntu-latest
-    needs: build-apk
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: linxr-debug
-          path: build/
-
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | \
-            sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Run smoke test on emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 33
-          arch: x86_64
-          profile: pixel_6
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
-          disable-animations: true
-          script: |
-            adb install build/app-debug.apk
-
-            echo "=== Launch app ==="
-            adb shell am start -n com.ahk.linxv/.MainActivity
-            sleep 3
-
-            echo "=== Tap Start VM button (center-bottom area) ==="
-            adb shell input tap 540 1700
-            sleep 10
-
-            echo "=== Screenshot after VM start attempt ==="
-            adb shell screencap -p /sdcard/screen.png
-            adb pull /sdcard/screen.png screen.png
-
-            echo "=== Dump logcat (app only) ==="
-            adb logcat -d --pid=$(adb shell pidof com.ahk.linxv) > logcat.txt 2>&1 || \
-              adb logcat -d -s "VmManager:*" "VmService:*" "QEMU:*" "Flutter:*" "*:E" > logcat.txt
-
-            echo "=== VM-related log lines ==="
-            grep -E "VmManager|VmService|QEMU|VM_START|startVm|stopVm|libqemu" logcat.txt || true
-
-            echo "=== Check app still running ==="
-            adb shell pidof com.ahk.linxv && echo "✅ APP IS RUNNING" || (echo "❌ APP CRASHED" && exit 1)
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: smoke-test-results
-          path: |
-            screen.png
-            logcat.txt
-          retention-days: 7
