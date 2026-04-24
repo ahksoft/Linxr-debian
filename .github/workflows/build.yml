@@ -31,14 +31,6 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: bash scripts/build_qcow2.sh
 
-      - name: Download Alpine kernel & initramfs from virt ISO (arm64)
-        run: |
-          OUTDIR="android/app/src/main/assets/vm"
-          mkdir -p "$OUTDIR"
-          curl -fsSL "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/aarch64/alpine-virt-3.19.9-aarch64.iso" -o /tmp/alpine-virt.iso
-          7z e /tmp/alpine-virt.iso boot/vmlinuz-virt boot/initramfs-virt -o"$OUTDIR/"
-          ls -lh "$OUTDIR/"
-
       - uses: actions/upload-artifact@v4
         with:
           name: base-qcow2
