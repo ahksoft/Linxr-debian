@@ -37,23 +37,7 @@ RUN curl -fsSL "https://download.qemu.org/qemu-${QEMU_VERSION}.tar.xz" | \
     tar -xJ -C /tmp
 
 # Meson cross-file for Android arm64
-RUN cat > /tmp/android-arm64.ini << 'EOF'
-[binaries]
-c = 'aarch64-linux-android26-clang'
-cpp = 'aarch64-linux-android26-clang++'
-ar = 'llvm-ar'
-ranlib = 'llvm-ranlib'
-strip = 'llvm-strip'
-nm = 'llvm-nm'
-objcopy = 'llvm-objcopy'
-pkgconfig = 'pkg-config'
-
-[host_machine]
-system = 'android'
-cpu_family = 'aarch64'
-cpu = 'aarch64'
-endian = 'little'
-EOF
+RUN printf '[binaries]\nc = "aarch64-linux-android26-clang"\ncpp = "aarch64-linux-android26-clang++"\nar = "llvm-ar"\nranlib = "llvm-ranlib"\nstrip = "llvm-strip"\nnm = "llvm-nm"\nobjcopy = "llvm-objcopy"\npkgconfig = "pkg-config"\n\n[host_machine]\nsystem = "android"\ncpu_family = "aarch64"\ncpu = "aarch64"\nendian = "little"\n' > /tmp/android-arm64.ini
 
 # Build qemu-system-aarch64 (static, minimal, with SLIRP networking)
 RUN mkdir -p /build/qemu-system && cd /build/qemu-system && \
