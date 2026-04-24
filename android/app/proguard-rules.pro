@@ -1,0 +1,3 @@
+-keep class io.flutter.** { *; }
+-keep class com.ahk.linxv.** { *; }
+-dontwarn io.flutter.**

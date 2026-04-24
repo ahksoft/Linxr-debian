@@ -38,7 +38,6 @@ jobs:
           mkdir -p "$OUTDIR"
           curl -fsSL "$BASE_URL/vmlinuz-virt"   -o "$OUTDIR/vmlinuz-virt"
           curl -fsSL "$BASE_URL/initramfs-virt" -o "$OUTDIR/initramfs-virt"
-          ls -lh "$OUTDIR/"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -50,7 +49,7 @@ jobs:
           retention-days: 1
 
   build-apk:
-    name: Build debug APK
+    name: Build APK
     runs-on: ubuntu-latest
     needs: build-qcow2
     steps:
@@ -61,15 +60,25 @@ jobs:
           name: base-qcow2
           path: android/app/src/main/assets/vm/
 
-      - name: Verify all assets
-        run: |
-          echo "=== VM assets ===" && ls -lh android/app/src/main/assets/vm/
-          echo "=== QEMU libs ===" && ls -lh android/app/src/main/jniLibs/arm64-v8a/
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/lib/android/sdk
+          key: android-sdk-34-${{ runner.os }}
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('android/**/*.gradle', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-
 
       - uses: subosito/flutter-action@v2
         with:
@@ -77,13 +86,8 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate debug keystore
-        run: |
-          keytool -genkeypair -v \
-            -keystore android/app/debug.keystore \
-            -alias debug -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android -keypass android \
-            -dname "CN=Debug,O=Android,C=US" 2>/dev/null
+      - name: Restore keystore from secret
+        run: echo "${{ secrets.KEYSTORE_B64 }}" | base64 -d > android/app/release.keystore
 
       - name: Flutter pub get
         run: flutter pub get
@@ -93,19 +97,26 @@ jobs:
 
       - name: Build debug APK
         run: flutter build apk --debug
+        env:
+          KEYSTORE_PATH: release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: linxr
+          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
-      - name: Recompress APK
-        run: |
-          cd build/app/outputs/flutter-apk/
-          mv app-debug.apk app-debug-orig.apk
-          unzip -q app-debug-orig.apk -d apk-contents
-          cd apk-contents
-          zip -r9 ../app-debug.apk . -x "*.kotlin_module"
-          cd ..
-          echo "Original: $(du -sh app-debug-orig.apk | cut -f1)  Compressed: $(du -sh app-debug.apk | cut -f1)"
+      - name: Build release APK
+        run: flutter build apk --release
+        env:
+          KEYSTORE_PATH: release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: linxr
+          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
       - uses: actions/upload-artifact@v4
         with:
           name: linxr-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
-          compression-level: 9
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linxr-release
+          path: build/app/outputs/flutter-apk/app-release.apk
