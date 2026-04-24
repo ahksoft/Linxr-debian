@@ -24,29 +24,31 @@ ENV NDK=/opt/android-ndk-${NDK_VERSION}
 ENV TOOLCHAIN=${NDK}/toolchains/llvm/prebuilt/linux-x86_64
 ENV PATH="${TOOLCHAIN}/bin:${PATH}"
 
-ENV CC="${TRIPLE}${API}-clang"
-ENV CXX="${TRIPLE}${API}-clang++"
-ENV AR="${TOOLCHAIN}/bin/llvm-ar"
-ENV RANLIB="${TOOLCHAIN}/bin/llvm-ranlib"
-ENV STRIP="${TOOLCHAIN}/bin/llvm-strip"
-ENV NM="${TOOLCHAIN}/bin/llvm-nm"
-ENV OBJCOPY="${TOOLCHAIN}/bin/llvm-objcopy"
-
 # QEMU source
 RUN curl -fsSL "https://download.qemu.org/qemu-${QEMU_VERSION}.tar.xz" | \
     tar -xJ -C /tmp
 
-# Meson cross-file for Android arm64
-RUN printf '[binaries]\nc = "aarch64-linux-android26-clang"\ncpp = "aarch64-linux-android26-clang++"\nar = "llvm-ar"\nranlib = "llvm-ranlib"\nstrip = "llvm-strip"\nnm = "llvm-nm"\nobjcopy = "llvm-objcopy"\npkgconfig = "pkg-config"\n\n[host_machine]\nsystem = "android"\ncpu_family = "aarch64"\ncpu = "aarch64"\nendian = "little"\n' > /tmp/android-arm64.ini
+# Symlink NDK tools so --cross-prefix=aarch64-linux-android- works
+# QEMU configure appends ar/ranlib/etc to the prefix, so we need those names
+RUN ln -sf "${TOOLCHAIN}/bin/llvm-ar"      "${TOOLCHAIN}/bin/aarch64-linux-android-ar" && \
+    ln -sf "${TOOLCHAIN}/bin/llvm-ranlib"  "${TOOLCHAIN}/bin/aarch64-linux-android-ranlib" && \
+    ln -sf "${TOOLCHAIN}/bin/llvm-nm"      "${TOOLCHAIN}/bin/aarch64-linux-android-nm" && \
+    ln -sf "${TOOLCHAIN}/bin/llvm-strip"   "${TOOLCHAIN}/bin/aarch64-linux-android-strip" && \
+    ln -sf "${TOOLCHAIN}/bin/llvm-objcopy" "${TOOLCHAIN}/bin/aarch64-linux-android-objcopy" && \
+    ln -sf "${TOOLCHAIN}/bin/${TRIPLE}${API}-clang"   "${TOOLCHAIN}/bin/aarch64-linux-android-gcc" && \
+    ln -sf "${TOOLCHAIN}/bin/${TRIPLE}${API}-clang++" "${TOOLCHAIN}/bin/aarch64-linux-android-g++"
+
+ENV CROSS_PREFIX="aarch64-linux-android-"
+ENV CC="${TRIPLE}${API}-clang"
+ENV CXX="${TRIPLE}${API}-clang++"
 
 # Build qemu-system-aarch64 (static, minimal, with SLIRP networking)
 RUN mkdir -p /build/qemu-system && cd /build/qemu-system && \
     /tmp/qemu-${QEMU_VERSION}/configure \
-      --cross-prefix="" \
+      --cross-prefix="${CROSS_PREFIX}" \
       --cc="${CC}" \
       --cxx="${CXX}" \
       --host-cc=gcc \
-      --cross-file=/tmp/android-arm64.ini \
       --target-list=aarch64-softmmu \
       --static \
       --disable-werror \
@@ -73,11 +75,10 @@ RUN mkdir -p /build/qemu-system && cd /build/qemu-system && \
 # Build qemu-img (static)
 RUN mkdir -p /build/qemu-img && cd /build/qemu-img && \
     /tmp/qemu-${QEMU_VERSION}/configure \
-      --cross-prefix="" \
+      --cross-prefix="${CROSS_PREFIX}" \
       --cc="${CC}" \
       --cxx="${CXX}" \
       --host-cc=gcc \
-      --cross-file=/tmp/android-arm64.ini \
       --target-list="" \
       --static \
       --disable-werror \
