@@ -67,9 +67,7 @@ RUN mkdir -p /build/qemu-system && cd /build/qemu-system && \
       --disable-dmg \
       --disable-qed \
       --disable-parallels \
-      --disable-sheepdog \
       --enable-slirp=internal \
-      --enable-virtfs=no \
       --prefix=/out && \
     make -j$(nproc) && \
     cp qemu-system-aarch64 /out/libqemu.so
