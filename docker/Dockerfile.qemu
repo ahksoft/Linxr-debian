@@ -10,7 +10,7 @@ ENV TRIPLE=aarch64-linux-android
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential ninja-build pkg-config python3 python3-pip \
-    libglib2.0-dev libglib2.0-static libpixman-1-dev flex bison \
+    libglib2.0-dev libpixman-1-dev flex bison \
     curl unzip git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
