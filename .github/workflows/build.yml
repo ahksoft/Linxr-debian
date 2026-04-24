@@ -31,12 +31,11 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p android/app/src/main/assets/vm
-          docker run --rm --privileged \
+          docker run --rm \
             -v $(pwd)/android/app/src/main/assets/vm:/out \
-            --platform linux/arm64 \
             debian:bookworm \
             bash -c "
-              apt-get update && apt-get install -y qemu-system-aarch64 qemu-utils wget libguestfs-tools
+              apt-get update && apt-get install -y wget qemu-utils libguestfs-tools
               $(cat scripts/_build_debian_rootfs.sh | tail -n +3)
             "
 
