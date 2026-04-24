@@ -33,10 +33,22 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: bash scripts/build_qcow2.sh
 
+      - name: Download Alpine kernel & initramfs (arm64)
+        run: |
+          OUTDIR="android/app/src/main/assets/vm"
+          BASE_URL="https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/aarch64/netboot"
+          mkdir -p "$OUTDIR"
+          curl -fsSL "$BASE_URL/vmlinuz-virt"    -o "$OUTDIR/vmlinuz-virt"
+          curl -fsSL "$BASE_URL/initramfs-virt"  -o "$OUTDIR/initramfs-virt"
+          ls -lh "$OUTDIR/"
+
       - uses: actions/upload-artifact@v4
         with:
           name: base-qcow2
-          path: android/app/src/main/assets/vm/base.qcow2.gz
+          path: |
+            android/app/src/main/assets/vm/base.qcow2.gz
+            android/app/src/main/assets/vm/vmlinuz-virt
+            android/app/src/main/assets/vm/initramfs-virt
           retention-days: 1
 
   build-apk:
