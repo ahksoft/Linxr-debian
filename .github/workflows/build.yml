@@ -62,11 +62,8 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Copy Kotlin sources & Android config
-        run: |
-          cp android/app/build.gradle android/app/build.gradle
-          # jniLibs must exist (QEMU .so binaries go here in a real release)
-          mkdir -p android/app/src/main/jniLibs
+      - name: Prepare jniLibs dir
+        run: mkdir -p android/app/src/main/jniLibs
 
       - name: Flutter pub get
         run: flutter pub get
