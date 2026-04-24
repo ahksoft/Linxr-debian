@@ -184,16 +184,34 @@ jobs:
           disable-animations: true
           script: |
             adb install build/app-debug.apk
+
+            echo "=== Launch app ==="
             adb shell am start -n com.ahk.linxv/.MainActivity
+            sleep 3
+
+            echo "=== Tap Start VM button (center-bottom area) ==="
+            adb shell input tap 540 1700
             sleep 10
+
+            echo "=== Screenshot after VM start attempt ==="
             adb shell screencap -p /sdcard/screen.png
             adb pull /sdcard/screen.png screen.png
-            # Verify app didn't crash (process still running)
+
+            echo "=== Dump logcat (app only) ==="
+            adb logcat -d --pid=$(adb shell pidof com.ahk.linxv) > logcat.txt 2>&1 || \
+              adb logcat -d -s "VmManager:*" "VmService:*" "QEMU:*" "Flutter:*" "*:E" > logcat.txt
+
+            echo "=== VM-related log lines ==="
+            grep -E "VmManager|VmService|QEMU|VM_START|startVm|stopVm|libqemu" logcat.txt || true
+
+            echo "=== Check app still running ==="
             adb shell pidof com.ahk.linxv && echo "✅ APP IS RUNNING" || (echo "❌ APP CRASHED" && exit 1)
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: smoke-test-screenshot
-          path: screen.png
+          name: smoke-test-results
+          path: |
+            screen.png
+            logcat.txt
           retention-days: 7
