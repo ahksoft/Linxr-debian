@@ -24,34 +24,39 @@ jobs:
       - name: Build QEMU for Android arm64
         if: steps.cache-qemu.outputs.cache-hit != 'true'
         run: |
-          mkdir -p android/app/src/main/jniLibs/arm64-v8a
-          # Download pre-built QEMU binaries from Termux bootstrap
-          # These are statically linked aarch64 binaries that run on Android
-          TERMUX_PKG="https://packages.termux.dev/apt/termux-main/pool/main/q"
-          # Find latest qemu-system package
-          PKG_URL=$(curl -s "https://packages.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages" \
-            | grep -A5 "^Package: qemu-system-aarch64-headless" | grep "^Filename:" | head -1 | awk '{print $2}')
-          if [ -z "$PKG_URL" ]; then
-            echo "Falling back to qemu-system package"
-            PKG_URL=$(curl -s "https://packages.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages" \
-              | grep -A5 "^Package: qemu-system" | grep "^Filename:" | head -1 | awk '{print $2}')
-          fi
-          echo "Downloading: https://packages.termux.dev/$PKG_URL"
-          curl -fsSL "https://packages.termux.dev/$PKG_URL" -o /tmp/qemu.deb
-          cd /tmp && ar x qemu.deb && tar -xf data.tar.xz 2>/dev/null || tar -xf data.tar.gz 2>/dev/null
-          find /tmp -name "qemu-system-aarch64" -type f | head -3
-          QEMU_BIN=$(find /tmp -name "qemu-system-aarch64" -type f | head -1)
-          cp "$QEMU_BIN" android/app/src/main/jniLibs/arm64-v8a/libqemu.so
-          # qemu-img
-          PKG_URL2=$(curl -s "https://packages.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages" \
-            | grep -A5 "^Package: qemu-utils" | grep "^Filename:" | head -1 | awk '{print $2}')
-          if [ -n "$PKG_URL2" ]; then
-            curl -fsSL "https://packages.termux.dev/$PKG_URL2" -o /tmp/qemu-utils.deb
-            cd /tmp && mkdir utils && cd utils && ar x /tmp/qemu-utils.deb && tar -xf data.tar.xz 2>/dev/null || tar -xf data.tar.gz 2>/dev/null
-            QIMG_BIN=$(find /tmp/utils -name "qemu-img" -type f | head -1)
-            [ -n "$QIMG_BIN" ] && cp "$QIMG_BIN" android/app/src/main/jniLibs/arm64-v8a/libqemu_img.so
-          fi
-          ls -lh android/app/src/main/jniLibs/arm64-v8a/
+          set -e
+          OUTDIR="$GITHUB_WORKSPACE/android/app/src/main/jniLibs/arm64-v8a"
+          mkdir -p "$OUTDIR"
+          BASE="https://packages.termux.dev/apt/termux-main"
+
+          # Resolve latest package filenames from index
+          PKGS=$(curl -fsSL "$BASE/dists/stable/main/binary-aarch64/Packages")
+          QEMU_DEB=$(echo "$PKGS" | grep -A15 "^Package: qemu-system-aarch64-headless" | grep "^Filename:" | head -1 | awk '{print $2}')
+          QIMG_DEB=$(echo "$PKGS" | grep -A15 "^Package: qemu-utils" | grep "^Filename:" | head -1 | awk '{print $2}')
+          echo "qemu-system: $QEMU_DEB"
+          echo "qemu-utils:  $QIMG_DEB"
+
+          # Download and extract qemu-system-aarch64
+          curl -fsSL "$BASE/$QEMU_DEB" -o /tmp/qemu-system.deb
+          mkdir -p /tmp/qemu-system-extract
+          cd /tmp/qemu-system-extract
+          ar x /tmp/qemu-system.deb
+          tar -xf data.tar.xz
+          QEMU_BIN=$(find . -name "qemu-system-aarch64" -type f | head -1)
+          echo "Found: $QEMU_BIN ($(du -sh $QEMU_BIN | cut -f1))"
+          cp "$QEMU_BIN" "$OUTDIR/libqemu.so"
+
+          # Download and extract qemu-img
+          curl -fsSL "$BASE/$QIMG_DEB" -o /tmp/qemu-utils.deb
+          mkdir -p /tmp/qemu-utils-extract
+          cd /tmp/qemu-utils-extract
+          ar x /tmp/qemu-utils.deb
+          tar -xf data.tar.xz
+          QIMG_BIN=$(find . -name "qemu-img" -type f | head -1)
+          echo "Found: $QIMG_BIN ($(du -sh $QIMG_BIN | cut -f1))"
+          cp "$QIMG_BIN" "$OUTDIR/libqemu_img.so"
+
+          ls -lh "$OUTDIR/"
 
       - name: Verify binaries
         run: ls -lh android/app/src/main/jniLibs/arm64-v8a/
