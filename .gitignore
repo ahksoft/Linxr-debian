@@ -17,8 +17,6 @@ android/.gradle/
 
 # VM assets (large binary files — built locally via build_qcow2.sh)
 android/app/src/main/assets/vm/base.qcow2.gz
-android/app/src/main/assets/vm/initramfs-virt
-android/app/src/main/assets/vm/vmlinuz-virt
 
 # macOS
 .DS_Store
