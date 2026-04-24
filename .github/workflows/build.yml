@@ -36,14 +36,17 @@ jobs:
             --platform linux/arm64 \
             debian:bookworm \
             bash -c "
-              apt-get update && apt-get install -y debootstrap qemu-user-static e2fsprogs qemu-utils binfmt-support
+              apt-get update && apt-get install -y qemu-system-aarch64 qemu-utils wget libguestfs-tools
               $(cat scripts/_build_debian_rootfs.sh | tail -n +3)
             "
 
       - uses: actions/upload-artifact@v4
         with:
           name: base-qcow2
-          path: android/app/src/main/assets/vm/base.qcow2.gz
+          path: |
+            android/app/src/main/assets/vm/base.qcow2.gz
+            android/app/src/main/assets/vm/vmlinuz-virt
+            android/app/src/main/assets/vm/initramfs-virt
           retention-days: 1
 
   build-apk:

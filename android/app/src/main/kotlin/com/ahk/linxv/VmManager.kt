@@ -147,16 +147,12 @@ class VmManager(private val context: Context) {
 
         cmd += listOf("-smp", vcpu.toString())
         cmd += listOf("-m", ramMb.toString())
-        // Attach base.qcow2 (readonly) and user.qcow2 (writable overlay)
-        val baseImage = File(vmDir, "base.qcow2")
-        cmd += listOf("-drive", "if=none,file=${baseImage.absolutePath},id=base,format=qcow2,readonly=on")
-        cmd += listOf("-drive", "if=none,file=$userImage,id=user,format=qcow2")
-        cmd += listOf("-device", "virtio-blk-pci,drive=user")
+        // Use user.qcow2 as main disk (has base.qcow2 as backing file)
+        cmd += listOf("-drive", "if=virtio,file=$userImage,format=qcow2,id=hd")
         // SSH forward only: host 2222 → guest 22
-        cmd += listOf("-netdev", "user,id=net0,hostfwd=tcp::2222-:22")
-        cmd += listOf("-device", "virtio-net-pci,netdev=net0,romfile=")
-        cmd += listOf("-display", "none")
-        cmd += listOf("-serial", "stdio")
+        cmd += listOf("-net", "user,hostfwd=tcp::2222-:22")
+        cmd += listOf("-net", "nic")
+        cmd += listOf("-nographic")
 
         val kernel = File(vmDir, "vmlinuz-virt")
         val initrd  = File(vmDir, "initramfs-virt")
@@ -164,8 +160,7 @@ class VmManager(private val context: Context) {
             cmd += listOf("-kernel", kernel.absolutePath)
             cmd += listOf("-initrd", initrd.absolutePath)
             cmd += listOf("-append",
-                "console=ttyAMA0 root=/dev/vda rootfstype=ext4 rw " +
-                "systemd.unit=multi-user.target quiet")
+                "root=/dev/vda2 console=ttyAMA0")
         }
         return cmd
     }
