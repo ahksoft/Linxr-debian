@@ -62,8 +62,14 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Prepare jniLibs dir
-        run: mkdir -p android/app/src/main/jniLibs
+      - name: Prepare build dirs & debug keystore
+        run: |
+          mkdir -p android/app/src/main/jniLibs
+          keytool -genkeypair -v \
+            -keystore android/app/debug.keystore \
+            -alias debug -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Debug,O=Android,C=US" 2>/dev/null
 
       - name: Flutter pub get
         run: flutter pub get
