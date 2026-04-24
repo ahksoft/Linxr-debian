@@ -1,4 +1,4 @@
-package com.ai2th.linxr
+package com.ahk.linxv
 
 import android.content.Intent
 import android.os.Bundle
@@ -8,7 +8,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.ai2th.linxr/vm"
+    private val CHANNEL = "com.ahk.linxv/vm"
     private val vmManager get() = (applicationContext as AlpineApp).vmManager
     private val executor = Executors.newSingleThreadExecutor()
 

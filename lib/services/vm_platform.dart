@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class VmPlatform {
-  static const _channel = MethodChannel('com.ai2th.linxr/vm');
+  static const _channel = MethodChannel('com.ahk.linxv/vm');
 
   static Future<void> startVm() async {
     await _channel.invokeMethod('startVm');

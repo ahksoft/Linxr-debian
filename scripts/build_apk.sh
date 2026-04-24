@@ -56,7 +56,7 @@ echo "--- Step 1: Scaffold fresh Flutter project ---"
 flutter create \
     --no-pub \
     --project-name linxr \
-    --org com.ai2th.linxr \
+    --org com.ahk.linxv \
     --platforms android \
     /tmp/build
 

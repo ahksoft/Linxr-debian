@@ -1,4 +1,4 @@
-package com.ai2th.linxr
+package com.ahk.linxv
 
 import android.content.Context
 import android.content.SharedPreferences

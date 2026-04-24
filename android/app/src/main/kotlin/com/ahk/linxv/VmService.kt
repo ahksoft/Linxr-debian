@@ -1,4 +1,4 @@
-package com.ai2th.linxr
+package com.ahk.linxv
 
 import android.app.Notification
 import android.app.NotificationChannel
