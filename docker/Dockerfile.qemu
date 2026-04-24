@@ -10,7 +10,7 @@ ENV TRIPLE=aarch64-linux-android
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential ninja-build pkg-config python3 python3-pip \
-    libglib2.0-dev libpixman-1-dev flex bison \
+    libglib2.0-dev libglib2.0-static libpixman-1-dev flex bison \
     curl unzip git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
@@ -36,7 +36,8 @@ RUN ln -sf "${TOOLCHAIN}/bin/llvm-ar"      "${TOOLCHAIN}/bin/aarch64-linux-andro
     ln -sf "${TOOLCHAIN}/bin/llvm-strip"   "${TOOLCHAIN}/bin/aarch64-linux-android-strip" && \
     ln -sf "${TOOLCHAIN}/bin/llvm-objcopy" "${TOOLCHAIN}/bin/aarch64-linux-android-objcopy" && \
     ln -sf "${TOOLCHAIN}/bin/${TRIPLE}${API}-clang"   "${TOOLCHAIN}/bin/aarch64-linux-android-gcc" && \
-    ln -sf "${TOOLCHAIN}/bin/${TRIPLE}${API}-clang++" "${TOOLCHAIN}/bin/aarch64-linux-android-g++"
+    ln -sf "${TOOLCHAIN}/bin/${TRIPLE}${API}-clang++" "${TOOLCHAIN}/bin/aarch64-linux-android-g++" && \
+    ln -sf "$(which pkg-config)" "${TOOLCHAIN}/bin/aarch64-linux-android-pkg-config"
 
 ENV CROSS_PREFIX="aarch64-linux-android-"
 ENV CC="${TRIPLE}${API}-clang"
