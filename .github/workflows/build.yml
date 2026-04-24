@@ -86,9 +86,6 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Restore keystore from secret
-        run: echo "${{ secrets.KEYSTORE_B64 }}" | base64 -d > android/app/release.keystore
-
       - name: Flutter pub get
         run: flutter pub get
 
@@ -97,19 +94,9 @@ jobs:
 
       - name: Build debug APK
         run: flutter build apk --debug
-        env:
-          KEYSTORE_PATH: release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: linxr
-          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
       - name: Build release APK
         run: flutter build apk --release
-        env:
-          KEYSTORE_PATH: release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: linxr
-          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
       - uses: actions/upload-artifact@v4
         with:

@@ -48,16 +48,16 @@ android {
 
     signingConfigs {
         debug {
-            storeFile file(System.getenv("KEYSTORE_PATH") ?: "debug.keystore")
-            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "android"
-            keyAlias System.getenv("KEY_ALIAS") ?: "debug"
-            keyPassword System.getenv("KEY_PASSWORD") ?: "android"
+            storeFile file("debug.keystore")
+            storePassword "linxr1234"
+            keyAlias "linxr"
+            keyPassword "linxr1234"
         }
         release {
-            storeFile file(System.getenv("KEYSTORE_PATH") ?: "debug.keystore")
-            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "android"
-            keyAlias System.getenv("KEY_ALIAS") ?: "linxr"
-            keyPassword System.getenv("KEY_PASSWORD") ?: "android"
+            storeFile file("debug.keystore")
+            storePassword "linxr1234"
+            keyAlias "linxr"
+            keyPassword "linxr1234"
         }
     }
 

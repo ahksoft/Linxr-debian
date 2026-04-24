@@ -13,7 +13,6 @@ pubspec.lock
 # Android
 android/local.properties
 android/.gradle/
-android/app/debug.keystore
 *.jks
 
 # VM assets (large binary files — built locally via build_qcow2.sh)
