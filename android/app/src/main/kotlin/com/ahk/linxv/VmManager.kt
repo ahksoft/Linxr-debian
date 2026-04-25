@@ -147,15 +147,26 @@ class VmManager(private val context: Context) {
 
         cmd += listOf("-smp", vcpu.toString())
         cmd += listOf("-m", ramMb.toString())
-        // Use user.qcow2 as main disk (has base.qcow2 as backing file)
-        cmd += listOf("-drive", "if=virtio,file=$userImage,format=qcow2,id=hd")
-        // SSH forward only: host 2222 → guest 22
-        cmd += listOf("-net", "user,hostfwd=tcp::2222-:22")
-        cmd += listOf("-net", "nic")
+        
+        // Debian-specific boot configuration
+        val kernel = File(vmDir, "vmlinuz-virt")
+        val initrd = File(vmDir, "initramfs-virt")
+        
+        if (kernel.exists() && initrd.exists()) {
+            // Debian boot with kernel/initrd
+            cmd += listOf("-kernel", kernel.absolutePath)
+            cmd += listOf("-initrd", initrd.absolutePath)
+            cmd += listOf("-append", "console=ttyAMA0 debug root=/dev/sda net.ifnames=0")
+            cmd += listOf("-hda", userImage)
+        } else {
+            // Fallback: boot from disk
+            cmd += listOf("-drive", "if=virtio,file=$userImage,format=qcow2,id=hd")
+        }
+        
         cmd += listOf("-nographic")
-
-        // Debian image boots from disk (has its own kernel/initrd)
-        // No external kernel/initrd needed
+        // SSH forward: host 2222 → guest 22
+        cmd += listOf("-nic", "user,model=virtio-net-pci,hostfwd=tcp::2222-:22")
+        
         return cmd
     }
 
@@ -168,6 +179,8 @@ class VmManager(private val context: Context) {
         return marker.exists()
             && resolveQemuBinary().exists()
             && File(vmDir, "base.qcow2").exists()
+            && File(vmDir, "vmlinuz-virt").exists()
+            && File(vmDir, "initramfs-virt").exists()
     }
 
     private fun extractAssets() {
