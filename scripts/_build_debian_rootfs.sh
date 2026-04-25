@@ -12,8 +12,6 @@ apt-get install -y wget qemu-utils libguestfs-tools
 echo "--- Downloading Debian Bullseye ARM64 ---"
 cd /tmp
 wget -q --show-progress ${RELEASE_URL}/debian-bullseye-arm64.qcow2
-wget -q ${RELEASE_URL}/vmlinuz-5.10.0-26-arm64
-wget -q ${RELEASE_URL}/initrd.img-5.10.0-26-arm64
 
 echo "--- Customizing Debian image ---"
 # Set root password to 'debian'
@@ -26,10 +24,6 @@ echo "--- Compressing qcow2 ---"
 qemu-img convert -f qcow2 -O qcow2 -c debian-bullseye-arm64.qcow2 ${OUT_DIR}/base.qcow2
 gzip -9 -c ${OUT_DIR}/base.qcow2 > ${OUT_DIR}/base.qcow2.gz
 rm ${OUT_DIR}/base.qcow2
-
-echo "--- Copying kernel and initrd ---"
-cp vmlinuz-5.10.0-26-arm64 ${OUT_DIR}/vmlinuz-virt
-cp initrd.img-5.10.0-26-arm64 ${OUT_DIR}/initramfs-virt
 
 echo "--- Build complete ---"
 ls -lh ${OUT_DIR}/

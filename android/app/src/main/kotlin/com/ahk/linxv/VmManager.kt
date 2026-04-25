@@ -154,14 +154,8 @@ class VmManager(private val context: Context) {
         cmd += listOf("-net", "nic")
         cmd += listOf("-nographic")
 
-        val kernel = File(vmDir, "vmlinuz-virt")
-        val initrd  = File(vmDir, "initramfs-virt")
-        if (kernel.exists() && initrd.exists()) {
-            cmd += listOf("-kernel", kernel.absolutePath)
-            cmd += listOf("-initrd", initrd.absolutePath)
-            cmd += listOf("-append",
-                "root=/dev/vda1 console=ttyAMA0")
-        }
+        // Debian image boots from disk (has its own kernel/initrd)
+        // No external kernel/initrd needed
         return cmd
     }
 
@@ -174,8 +168,6 @@ class VmManager(private val context: Context) {
         return marker.exists()
             && resolveQemuBinary().exists()
             && File(vmDir, "base.qcow2").exists()
-            && File(vmDir, "vmlinuz-virt").exists()
-            && File(vmDir, "initramfs-virt").exists()
     }
 
     private fun extractAssets() {
