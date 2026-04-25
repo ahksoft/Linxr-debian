@@ -19,7 +19,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: android/app/src/main/assets/vm/base.qcow2.gz
-          key: qcow2-debian-${{ hashFiles('scripts/_build_debian_rootfs.sh') }}
+          key: qcow2-debian-${{ hashFiles('scripts/debian_build.sh') }}
 
       - name: Set up QEMU (for ARM64 emulation)
         if: steps.cache.outputs.cache-hit != 'true'
@@ -31,13 +31,14 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p android/app/src/main/assets/vm
-          docker run --rm \
+          docker run --rm --privileged \
+            -v $(pwd)/scripts:/scripts \
             -v $(pwd)/android/app/src/main/assets/vm:/out \
+            -e SUITE=bookworm \
+            -e VIRTUAL_SIZE=8G \
+            -e ROOT_PASSWORD=root \
             debian:bookworm \
-            bash -c "
-              apt-get update && apt-get install -y wget qemu-utils libguestfs-tools
-              $(cat scripts/_build_debian_rootfs.sh | tail -n +3)
-            "
+            bash /scripts/debian_build.sh
 
       - uses: actions/upload-artifact@v4
         with:
