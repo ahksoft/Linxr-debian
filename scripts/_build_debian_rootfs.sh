@@ -15,23 +15,10 @@ wget -q --show-progress ${RELEASE_URL}/debian-bullseye-arm64.qcow2
 wget -q --show-progress ${RELEASE_URL}/vmlinuz-5.10.0-26-arm64
 wget -q --show-progress ${RELEASE_URL}/initrd.img-5.10.0-26-arm64
 
-echo "--- Customizing Debian image ---"
-# Set root password to 'debian'
-# Configure networking and SSH for Debian
-virt-customize -a debian-bullseye-arm64.qcow2 \
-  --root-password password:debian \
-  --hostname linxr-debian \
-  --run-command 'systemctl enable ssh' \
-  --run-command 'systemctl enable systemd-networkd' \
-  --run-command 'mkdir -p /etc/systemd/network' \
-  --write '/etc/systemd/network/20-wired.network:[Match]
-Name=en*
-
-[Network]
-DHCP=yes' \
-  --run-command 'sed -i "s/#PermitRootLogin.*/PermitRootLogin yes/" /etc/ssh/sshd_config' \
-  --run-command 'sed -i "s/#PasswordAuthentication.*/PasswordAuthentication yes/" /etc/ssh/sshd_config' \
-  2>/dev/null || echo "virt-customize not available, using as-is"
+echo "--- Using Debian image as-is ---"
+# DebianOnQEMU image has default credentials: root:root and debian:debian
+# SSH is already enabled by default
+echo "Default credentials: root:root or debian:debian"
 
 echo "--- Compressing qcow2 ---"
 qemu-img convert -f qcow2 -O qcow2 -c debian-bullseye-arm64.qcow2 ${OUT_DIR}/base.qcow2

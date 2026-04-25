@@ -41,6 +41,7 @@ class VmManager(private val context: Context) {
         if (isRunning || vmProcess != null) {
             Log.d(TAG, "Stopping existing VM before restart")
             stopVm()
+            Thread.sleep(2000) // Wait for port 2222 to be released
         }
 
         val freshExtraction = !assetsReady()

@@ -52,7 +52,7 @@ Linxr runs a full Debian Linux environment inside a QEMU virtual machine on any 
 
 ```bash
 ssh root@localhost -p 2222
-# password: debian
+# password: root
 ```
 
 ---
@@ -130,7 +130,7 @@ adb install build/linxr-debug.apk
 | Field | Value |
 |---|---|
 | Username | `root` |
-| Password | `debian` |
+| Password | `root` |
 
 > Change the root password with `passwd` after first login.
 

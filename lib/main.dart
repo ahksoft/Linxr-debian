@@ -213,7 +213,7 @@ class _SshInfoCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                'ssh root@localhost -p 2222  # password: alpine',
+                'ssh root@localhost -p 2222  # password: root',
                 style: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 12,
