@@ -160,7 +160,7 @@ class VmManager(private val context: Context) {
             cmd += listOf("-kernel", kernel.absolutePath)
             cmd += listOf("-initrd", initrd.absolutePath)
             cmd += listOf("-append",
-                "root=/dev/vda2 console=ttyAMA0")
+                "root=/dev/vda1 console=ttyAMA0")
         }
         return cmd
     }
