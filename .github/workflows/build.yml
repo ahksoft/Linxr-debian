@@ -2,14 +2,14 @@ name: Build APK
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, alpine-to-debian]
   pull_request:
     branches: [main, master]
   workflow_dispatch:
 
 jobs:
   build-qcow2:
-    name: Build Alpine base image
+    name: Build Debian base image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +19,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: android/app/src/main/assets/vm/base.qcow2.gz
-          key: qcow2-${{ hashFiles('scripts/_build_rootfs.sh') }}
+          key: qcow2-debian-${{ hashFiles('scripts/debian_build.sh') }}
 
       - name: Set up QEMU (for ARM64 emulation)
         if: steps.cache.outputs.cache-hit != 'true'
@@ -29,7 +29,20 @@ jobs:
 
       - name: Build base.qcow2.gz
         if: steps.cache.outputs.cache-hit != 'true'
-        run: bash scripts/build_qcow2.sh
+        run: |
+          mkdir -p android/app/src/main/assets/vm
+          docker run --rm --privileged \
+            -v $(pwd)/scripts:/scripts \
+            -v $(pwd)/android/app/src/main/assets/vm:/out \
+            -e SUITE=bookworm \
+            -e VIRTUAL_SIZE=8G \
+            -e ROOT_PASSWORD=root \
+            debian:bookworm \
+            bash -c "
+              apt-get update -qq && \
+              apt-get install -y debootstrap qemu-user-static binfmt-support qemu-utils e2fsprogs rsync && \
+              bash /scripts/debian_build.sh
+            "
 
       - uses: actions/upload-artifact@v4
         with:

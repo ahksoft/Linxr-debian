@@ -41,6 +41,7 @@ class VmManager(private val context: Context) {
         if (isRunning || vmProcess != null) {
             Log.d(TAG, "Stopping existing VM before restart")
             stopVm()
+            Thread.sleep(2000) // Wait for port 2222 to be released
         }
 
         val freshExtraction = !assetsReady()
@@ -56,12 +57,11 @@ class VmManager(private val context: Context) {
         val baseImage = File(vmDir, "base.qcow2")
         val userImage = File(vmDir, "user.qcow2")
 
-        // Recreate overlay only when base changed or doesn't exist.
-        // Persistent overlay preserves installed packages across reboots.
+        // For Debian: copy base to user (no overlay, full copy)
         if (freshExtraction || !userImage.exists()) {
-            Log.d(TAG, "Creating fresh user.qcow2 (freshExtraction=$freshExtraction)")
+            Log.d(TAG, "Copying base.qcow2 to user.qcow2 (freshExtraction=$freshExtraction)")
             userImage.delete()
-            createUserImage(userImage.absolutePath, baseImage.absolutePath)
+            baseImage.copyTo(userImage, overwrite = true)
         } else {
             Log.d(TAG, "Reusing existing user.qcow2 (state preserved)")
         }
@@ -139,7 +139,7 @@ class VmManager(private val context: Context) {
 
         if (isArm64()) {
             cmd += listOf("-machine", "virt")
-            cmd += listOf("-cpu", "cortex-a53")
+            cmd += listOf("-cpu", "cortex-a57")
         } else {
             cmd += listOf("-machine", "q35")
             cmd += listOf("-cpu", "qemu64")
@@ -147,26 +147,29 @@ class VmManager(private val context: Context) {
 
         cmd += listOf("-smp", vcpu.toString())
         cmd += listOf("-m", ramMb.toString())
-        // Attach base.qcow2 (readonly) and user.qcow2 (writable overlay)
-        val baseImage = File(vmDir, "base.qcow2")
-        cmd += listOf("-drive", "if=none,file=${baseImage.absolutePath},id=base,format=qcow2,readonly=on")
+        
+        // Disk setup: single user.qcow2 (no base overlay for Debian)
         cmd += listOf("-drive", "if=none,file=$userImage,id=user,format=qcow2")
         cmd += listOf("-device", "virtio-blk-pci,drive=user")
-        // SSH forward only: host 2222 → guest 22
+        
+        // Network with romfile disabled to avoid "efi-virtio.rom" warning
         cmd += listOf("-netdev", "user,id=net0,hostfwd=tcp::2222-:22")
         cmd += listOf("-device", "virtio-net-pci,netdev=net0,romfile=")
+        
+        // Display
         cmd += listOf("-display", "none")
         cmd += listOf("-serial", "stdio")
-
+        
+        // Debian boot with kernel/initrd
         val kernel = File(vmDir, "vmlinuz-virt")
-        val initrd  = File(vmDir, "initramfs-virt")
+        val initrd = File(vmDir, "initramfs-virt")
+        
         if (kernel.exists() && initrd.exists()) {
             cmd += listOf("-kernel", kernel.absolutePath)
             cmd += listOf("-initrd", initrd.absolutePath)
-            cmd += listOf("-append",
-                "console=ttyAMA0 root=/dev/vda rootfstype=ext4 rw " +
-                "modules=virtio_blk,ext4 quiet")
+            cmd += listOf("-append", "console=ttyAMA0 root=/dev/vda rw net.ifnames=0")
         }
+        
         return cmd
     }
 
@@ -232,6 +235,10 @@ class VmManager(private val context: Context) {
 
     // -------------------------------------------------------------------------
     // qemu-img: create QCOW2 overlay
+    // -------------------------------------------------------------------------
+
+    // -------------------------------------------------------------------------
+    // qcow2 overlay creation
     // -------------------------------------------------------------------------
 
     private fun createUserImage(userImagePath: String, baseImagePath: String) {
