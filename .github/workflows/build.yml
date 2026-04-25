@@ -38,7 +38,11 @@ jobs:
             -e VIRTUAL_SIZE=8G \
             -e ROOT_PASSWORD=root \
             debian:bookworm \
-            bash /scripts/debian_build.sh
+            bash -c "
+              apt-get update -qq && \
+              apt-get install -y debootstrap qemu-user-static binfmt-support qemu-utils e2fsprogs rsync && \
+              bash /scripts/debian_build.sh
+            "
 
       - uses: actions/upload-artifact@v4
         with:
