@@ -15,10 +15,14 @@ wget -q --show-progress ${RELEASE_URL}/debian-bullseye-arm64.qcow2
 wget -q --show-progress ${RELEASE_URL}/vmlinuz-5.10.0-26-arm64
 wget -q --show-progress ${RELEASE_URL}/initrd.img-5.10.0-26-arm64
 
-echo "--- Using Debian image as-is ---"
-# DebianOnQEMU image has default credentials: root:root and debian:debian
-# SSH is already enabled by default
-echo "Default credentials: root:root or debian:debian"
+echo "--- Customizing Debian image ---"
+# Set root password to 'root' using virt-customize
+virt-customize -a debian-bullseye-arm64.qcow2 \
+  --root-password password:root \
+  --run-command 'systemctl enable ssh' \
+  --run-command 'sed -i "s/#PermitRootLogin.*/PermitRootLogin yes/" /etc/ssh/sshd_config' \
+  --run-command 'sed -i "s/#PasswordAuthentication.*/PasswordAuthentication yes/" /etc/ssh/sshd_config' \
+  2>&1 || echo "Warning: virt-customize failed, using default credentials"
 
 echo "--- Compressing qcow2 ---"
 qemu-img convert -f qcow2 -O qcow2 -c debian-bullseye-arm64.qcow2 ${OUT_DIR}/base.qcow2
