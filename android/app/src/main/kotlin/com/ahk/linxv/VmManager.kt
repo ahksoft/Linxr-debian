@@ -56,12 +56,12 @@ class VmManager(private val context: Context) {
         val baseImage = File(vmDir, "base.qcow2")
         val userImage = File(vmDir, "user.qcow2")
 
-        // For Debian: copy base to user on first run (not an overlay)
-        // Debian image has partitions, can't use backing files
+        // For Debian: use overlay with backing file
+        // Even though Debian has partitions, qcow2 overlay works at block level
         if (freshExtraction || !userImage.exists()) {
-            Log.d(TAG, "Copying base.qcow2 to user.qcow2 (freshExtraction=$freshExtraction)")
+            Log.d(TAG, "Creating user.qcow2 overlay (freshExtraction=$freshExtraction)")
             userImage.delete()
-            baseImage.copyTo(userImage, overwrite = true)
+            createUserImage(userImage.absolutePath, baseImage.absolutePath)
         } else {
             Log.d(TAG, "Reusing existing user.qcow2 (state preserved)")
         }
@@ -229,8 +229,10 @@ class VmManager(private val context: Context) {
     // qemu-img: create QCOW2 overlay
     // -------------------------------------------------------------------------
 
-    // Not used for Debian (uses full copy instead of overlay)
-    /*
+    // -------------------------------------------------------------------------
+    // qcow2 overlay creation
+    // -------------------------------------------------------------------------
+
     private fun createUserImage(userImagePath: String, baseImagePath: String) {
         val qemuImg = File(nativeLibDir, "libqemu_img.so")
         if (!qemuImg.exists()) throw IllegalStateException(
@@ -250,7 +252,6 @@ class VmManager(private val context: Context) {
         }
         Log.d(TAG, "Created user.qcow2 at $userImagePath")
     }
-    */
 
     // -------------------------------------------------------------------------
     // Helpers
