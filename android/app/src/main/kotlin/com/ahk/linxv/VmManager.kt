@@ -56,12 +56,11 @@ class VmManager(private val context: Context) {
         val baseImage = File(vmDir, "base.qcow2")
         val userImage = File(vmDir, "user.qcow2")
 
-        // For Debian: use overlay with backing file
-        // Even though Debian has partitions, qcow2 overlay works at block level
+        // For Debian: copy base to user (no overlay, full copy)
         if (freshExtraction || !userImage.exists()) {
-            Log.d(TAG, "Creating user.qcow2 overlay (freshExtraction=$freshExtraction)")
+            Log.d(TAG, "Copying base.qcow2 to user.qcow2 (freshExtraction=$freshExtraction)")
             userImage.delete()
-            createUserImage(userImage.absolutePath, baseImage.absolutePath)
+            baseImage.copyTo(userImage, overwrite = true)
         } else {
             Log.d(TAG, "Reusing existing user.qcow2 (state preserved)")
         }
@@ -139,7 +138,7 @@ class VmManager(private val context: Context) {
 
         if (isArm64()) {
             cmd += listOf("-machine", "virt")
-            cmd += listOf("-cpu", "cortex-a53")
+            cmd += listOf("-cpu", "cortex-a57")
         } else {
             cmd += listOf("-machine", "q35")
             cmd += listOf("-cpu", "qemu64")
@@ -148,8 +147,7 @@ class VmManager(private val context: Context) {
         cmd += listOf("-smp", vcpu.toString())
         cmd += listOf("-m", ramMb.toString())
         
-        // Disk setup: base (readonly) + user (writable overlay)
-        cmd += listOf("-drive", "if=none,file=$baseImage,id=base,format=qcow2,readonly=on")
+        // Disk setup: single user.qcow2 (no base overlay for Debian)
         cmd += listOf("-drive", "if=none,file=$userImage,id=user,format=qcow2")
         cmd += listOf("-device", "virtio-blk-pci,drive=user")
         
@@ -168,7 +166,7 @@ class VmManager(private val context: Context) {
         if (kernel.exists() && initrd.exists()) {
             cmd += listOf("-kernel", kernel.absolutePath)
             cmd += listOf("-initrd", initrd.absolutePath)
-            cmd += listOf("-append", "console=ttyAMA0 root=/dev/vda rootfstype=ext4 rootflags=rw modules=virtio_blk,ext4 quiet")
+            cmd += listOf("-append", "console=ttyAMA0 root=/dev/vda rw net.ifnames=0")
         }
         
         return cmd
