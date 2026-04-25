@@ -148,24 +148,28 @@ class VmManager(private val context: Context) {
         cmd += listOf("-smp", vcpu.toString())
         cmd += listOf("-m", ramMb.toString())
         
-        // Debian-specific boot configuration
+        // Disk setup: base (readonly) + user (writable overlay)
+        cmd += listOf("-drive", "if=none,file=$baseImage,id=base,format=qcow2,readonly=on")
+        cmd += listOf("-drive", "if=none,file=$userImage,id=user,format=qcow2")
+        cmd += listOf("-device", "virtio-blk-pci,drive=user")
+        
+        // Network with romfile disabled to avoid "efi-virtio.rom" warning
+        cmd += listOf("-netdev", "user,id=net0,hostfwd=tcp::2222-:22")
+        cmd += listOf("-device", "virtio-net-pci,netdev=net0,romfile=")
+        
+        // Display
+        cmd += listOf("-display", "none")
+        cmd += listOf("-serial", "stdio")
+        
+        // Debian boot with kernel/initrd
         val kernel = File(vmDir, "vmlinuz-virt")
         val initrd = File(vmDir, "initramfs-virt")
         
         if (kernel.exists() && initrd.exists()) {
-            // Debian boot with kernel/initrd
             cmd += listOf("-kernel", kernel.absolutePath)
             cmd += listOf("-initrd", initrd.absolutePath)
-            cmd += listOf("-append", "console=ttyAMA0 debug root=/dev/sda net.ifnames=0")
-            cmd += listOf("-hda", userImage)
-        } else {
-            // Fallback: boot from disk
-            cmd += listOf("-drive", "if=virtio,file=$userImage,format=qcow2,id=hd")
+            cmd += listOf("-append", "console=ttyAMA0 root=/dev/vda rootfstype=ext4 rootflags=rw modules=virtio_blk,ext4 quiet")
         }
-        
-        cmd += listOf("-nographic")
-        // SSH forward: host 2222 → guest 22
-        cmd += listOf("-nic", "user,model=virtio-net-pci,hostfwd=tcp::2222-:22")
         
         return cmd
     }
