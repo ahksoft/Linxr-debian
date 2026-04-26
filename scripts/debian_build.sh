@@ -103,15 +103,26 @@ DHCP=yes
 DNS=8.8.8.8
 EOF
 
-chroot "$ROOTFS" bash -c "echo 'root:${ROOT_PASSWORD}' | chpasswd"
+# Set root password - ensure shadow file exists
+chroot "$ROOTFS" bash -c "
+    touch /etc/shadow
+    chmod 640 /etc/shadow
+    echo 'root:${ROOT_PASSWORD}' | chpasswd
+    passwd -u root 2>/dev/null || true
+"
 
 mkdir -p "$ROOTFS/run/sshd"
 chroot "$ROOTFS" ssh-keygen -A 2>/dev/null || true
 
-sed -i \
-    -e 's|^#\?PermitRootLogin.*|PermitRootLogin yes|' \
-    -e 's|^#\?PasswordAuthentication.*|PasswordAuthentication yes|' \
-    "$ROOTFS/etc/ssh/sshd_config"
+# Force SSH password authentication
+cat > "$ROOTFS/etc/ssh/sshd_config.d/99-linxr.conf" <<EOF
+PermitRootLogin yes
+PasswordAuthentication yes
+ChallengeResponseAuthentication no
+UsePAM yes
+EOF
+
+chmod 644 "$ROOTFS/etc/ssh/sshd_config.d/99-linxr.conf"
 
 echo "%sudo ALL=(ALL) NOPASSWD: ALL" > "$ROOTFS/etc/sudoers.d/nopasswd"
 chmod 0440 "$ROOTFS/etc/sudoers.d/nopasswd"
