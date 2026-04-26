@@ -103,13 +103,9 @@ DHCP=yes
 DNS=8.8.8.8
 EOF
 
-# Set root password - ensure shadow file exists
-chroot "$ROOTFS" bash -c "
-    touch /etc/shadow
-    chmod 640 /etc/shadow
-    echo 'root:${ROOT_PASSWORD}' | chpasswd
-    passwd -u root 2>/dev/null || true
-"
+# Set root password with pre-hashed value (password: root)
+chroot "$ROOTFS" usermod -p '\$6\$saltsalt\$qFmFH.bQmmtXzyBY0s9v7Oicd2z4XSIecDzlB5KiA2/jctKu9YterLp8wwnSq.qc.eoxqOqdPujpL6vG/0DG9/' root
+chroot "$ROOTFS" passwd -u root
 
 mkdir -p "$ROOTFS/run/sshd"
 chroot "$ROOTFS" ssh-keygen -A 2>/dev/null || true
