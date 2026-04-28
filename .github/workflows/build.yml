@@ -19,30 +19,24 @@ jobs:
         uses: actions/cache@v4
         with:
           path: android/app/src/main/assets/vm/base.qcow2.gz
-          key: qcow2-debian-${{ hashFiles('scripts/debian_build.sh') }}
+          key: qcow2-debian-arm64-v1
 
       - name: Set up QEMU (for ARM64 emulation)
         if: steps.cache.outputs.cache-hit != 'true'
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
+        run: echo "Using pre-built rootfs, no QEMU setup needed"
 
-      - name: Build base.qcow2.gz
+      - name: Download pre-built Debian rootfs
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p android/app/src/main/assets/vm
-          docker run --rm --privileged \
-            -v $(pwd)/scripts:/scripts \
-            -v $(pwd)/android/app/src/main/assets/vm:/out \
-            -e SUITE=bookworm \
-            -e VIRTUAL_SIZE=8G \
-            -e ROOT_PASSWORD=root \
-            debian:bookworm \
-            bash -c "
-              apt-get update -qq && \
-              apt-get install -y debootstrap qemu-user-static binfmt-support qemu-utils e2fsprogs rsync && \
-              bash /scripts/debian_build.sh
-            "
+          cd android/app/src/main/assets/vm
+          
+          # Download from your working release
+          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/base.qcow2.gz
+          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/vmlinuz-virt
+          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/initramfs-virt
+          
+          ls -lh
 
       - uses: actions/upload-artifact@v4
         with:
