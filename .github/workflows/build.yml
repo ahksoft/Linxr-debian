@@ -3,8 +3,6 @@ name: Build APK
 on:
   push:
     branches: [main, master, alpine-to-debian]
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
 
 jobs:
@@ -32,9 +30,17 @@ jobs:
           cd android/app/src/main/assets/vm
           
           # Download from your working release
-          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/base.qcow2.gz
-          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/vmlinuz-virt
-          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/initramfs-virt
+          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/debian-trixie-arm64.qcow2
+          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/vmlinuz-6.12.73+deb13-arm64
+          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/initrd.img-6.12.73+deb13-arm64
+          
+          # Rename to expected names
+          mv debian-trixie-arm64.qcow2 base.qcow2
+          mv vmlinuz-6.12.73+deb13-arm64 vmlinuz-virt
+          mv initrd.img-6.12.73+deb13-arm64 initramfs-virt
+          
+          # Compress base image
+          gzip -9 base.qcow2
           
           ls -lh
 
