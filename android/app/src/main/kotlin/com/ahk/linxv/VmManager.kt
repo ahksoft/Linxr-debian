@@ -153,7 +153,7 @@ class VmManager(private val context: Context) {
         cmd += listOf("-device", "virtio-blk-pci,drive=user")
         
         // Network with romfile disabled to avoid "efi-virtio.rom" warning
-        cmd += listOf("-netdev", "user,id=net0,hostfwd=tcp::2222-:22")
+        cmd += listOf("-netdev", "user,id=net0,hostfwd=tcp::2222-:22,dns=8.8.8.8")
         cmd += listOf("-device", "virtio-net-pci,netdev=net0,romfile=")
         
         // Display
