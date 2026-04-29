@@ -1,28 +1,18 @@
 #!/usr/bin/env bash
-# Minimal Debian ARM64 QEMU image builder
+# Debian ARM64 QEMU image builder - based on working workflow
 set -euo pipefail
 
 # Config
-SUITE="${SUITE:-bookworm}"
-VIRTUAL_SIZE="${VIRTUAL_SIZE:-8G}"
-ROOT_PASSWORD="${ROOT_PASSWORD:-root}"
-MIRROR="${MIRROR:-http://deb.debian.org/debian}"
-
-BASE_PACKAGES=(
-    systemd systemd-sysv udev dbus
-    openssh-server sudo
-    iproute2 iputils-ping ca-certificates
-    linux-image-arm64
-)
+SUITE="${SUITE:-trixie}"
+ARCH="arm64"
+MIRROR="http://deb.debian.org/debian"
+HOSTNAME="linxr-debian"
 
 # Paths
 OUT_DIR="/out"
 ROOTFS="$(mktemp -d /tmp/deb-rootfs-XXXXX)"
-MNT="$(mktemp -d /tmp/deb-mnt-XXXXX)"
 RAW_IMG="/tmp/debian-arm64.raw"
 QCOW2="${OUT_DIR}/base.qcow2"
-KERNEL_OUT="${OUT_DIR}/vmlinuz-virt"
-INITRD_OUT="${OUT_DIR}/initramfs-virt"
 
 mkdir -p "$OUT_DIR"
 
@@ -30,159 +20,102 @@ log() { echo ""; echo "=== $* ==="; }
 
 cleanup() {
     set +e
-    for mp in proc sys dev/pts dev run; do
-        mountpoint -q "$ROOTFS/$mp" 2>/dev/null && umount -lf "$ROOTFS/$mp"
-    done
-    mountpoint -q "$MNT" 2>/dev/null && umount -lf "$MNT"
+    umount -lf "$ROOTFS"/{proc,sys,dev/pts,dev} 2>/dev/null
     rm -f "$RAW_IMG"
-    rm -rf "$ROOTFS" "$MNT"
+    rm -rf "$ROOTFS"
 }
 trap cleanup EXIT
 
 # Step 1: Debootstrap stage 1
-log "[1/7] Debootstrap stage 1"
-debootstrap \
-    --arch=arm64 \
-    --foreign \
-    --variant=minbase \
-    --include="$(IFS=,; echo "${BASE_PACKAGES[*]}")" \
-    "$SUITE" \
-    "$ROOTFS" \
-    "$MIRROR"
+log "[1/6] Debootstrap stage 1"
+debootstrap --foreign --arch="$ARCH" --include=locales "$SUITE" "$ROOTFS" "$MIRROR"
 
-# Step 2: Inject lean configs
-log "[2/7] Injecting dpkg no-doc config"
-mkdir -p "$ROOTFS/etc/dpkg/dpkg.cfg.d"
-cat > "$ROOTFS/etc/dpkg/dpkg.cfg.d/01_nodoc" <<'EOF'
-path-exclude /usr/share/doc/*
-path-include /usr/share/doc/*/copyright
-path-exclude /usr/share/man/*
-path-exclude /usr/share/info/*
-path-exclude /usr/share/locale/*
-path-include /usr/share/locale/locale.alias
-EOF
-
-mkdir -p "$ROOTFS/etc/apt/apt.conf.d"
-cat > "$ROOTFS/etc/apt/apt.conf.d/99lean" <<'EOF'
-APT::Install-Recommends "false";
-APT::Install-Suggests "false";
-Acquire::Languages "none";
-EOF
-
-# Step 3: Debootstrap stage 2
-log "[3/7] Debootstrap stage 2"
-cp /usr/bin/qemu-aarch64-static "$ROOTFS/usr/bin/"
-mount --bind /proc "$ROOTFS/proc"
-mount --bind /sys "$ROOTFS/sys"
-mount --bind /dev "$ROOTFS/dev"
-mount --bind /dev/pts "$ROOTFS/dev/pts"
-mount -t tmpfs tmpfs "$ROOTFS/run"
-
+# Step 2: Debootstrap stage 2
+log "[2/6] Debootstrap stage 2"
 chroot "$ROOTFS" /debootstrap/debootstrap --second-stage
 
-# Step 4: Configure system
-log "[4/7] Configuring system"
+# Step 3: Install kernel and essential packages
+log "[3/6] Installing kernel and packages"
+echo 'fake /usr ext4 fake 0 1' > "$ROOTFS/etc/fstab"
 
-cat > "$ROOTFS/etc/fstab" <<EOF
-/dev/vda  /  ext4  rw,relatime,errors=remount-ro  0  1
+chroot "$ROOTFS" apt update
+chroot "$ROOTFS" apt install -y initramfs-tools
+
+# Configure initramfs for minimal size
+sed -i 's/MODULES=most/MODULES=list/' "$ROOTFS/etc/initramfs-tools/initramfs.conf"
+
+cat >> "$ROOTFS/etc/initramfs-tools/modules" <<EOF
+virtio_mmio
+virtio_blk
+virtio_net
+virtio_pci
+ext4
+sd_mod
 EOF
 
-echo "linxr-debian" > "$ROOTFS/etc/hostname"
-cat > "$ROOTFS/etc/hosts" <<EOF
-127.0.0.1   localhost
-127.0.1.1   linxr-debian
-EOF
+# Install kernel and SSH
+chroot "$ROOTFS" apt install -y linux-image-arm64 openssh-server sudo
 
-mkdir -p "$ROOTFS/etc/systemd/network"
-cat > "$ROOTFS/etc/systemd/network/10-eth.network" <<EOF
-[Match]
-Name=en* eth*
+# Update fstab
+echo '/dev/vda / ext4 errors=remount-ro 0 1' > "$ROOTFS/etc/fstab"
 
-[Network]
-DHCP=yes
-DNS=8.8.8.8
-EOF
-
-# Set root password with pre-hashed value (password: root)
-chroot "$ROOTFS" usermod -p '\$6\$saltsalt\$qFmFH.bQmmtXzyBY0s9v7Oicd2z4XSIecDzlB5KiA2/jctKu9YterLp8wwnSq.qc.eoxqOqdPujpL6vG/0DG9/' root
-chroot "$ROOTFS" passwd -u root
-
-mkdir -p "$ROOTFS/run/sshd"
-chroot "$ROOTFS" ssh-keygen -A 2>/dev/null || true
-
-# Force SSH password authentication
-cat > "$ROOTFS/etc/ssh/sshd_config.d/99-linxr.conf" <<EOF
+# Step 4: Configure SSH
+log "[4/6] Configuring SSH"
+cat > "$ROOTFS/etc/ssh/sshd_config" <<EOF
+Port 22
+ListenAddress 0.0.0.0
+ListenAddress ::
 PermitRootLogin yes
 PasswordAuthentication yes
-ChallengeResponseAuthentication no
+PubkeyAuthentication yes
 UsePAM yes
 EOF
 
-chmod 644 "$ROOTFS/etc/ssh/sshd_config.d/99-linxr.conf"
+# Step 5: Configure system
+log "[5/6] Configuring system"
 
-echo "%sudo ALL=(ALL) NOPASSWD: ALL" > "$ROOTFS/etc/sudoers.d/nopasswd"
-chmod 0440 "$ROOTFS/etc/sudoers.d/nopasswd"
+# Network configuration using /etc/network/interfaces
+cat >> "$ROOTFS/etc/network/interfaces" <<EOF
 
-chroot "$ROOTFS" systemctl enable ssh systemd-networkd systemd-resolved 2>/dev/null || true
-chroot "$ROOTFS" systemctl disable apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+auto eth0
+iface eth0 inet dhcp
+EOF
 
-# Step 5: Extract kernel/initrd, purge from rootfs
-log "[5/7] Extracting kernel/initrd"
+# DNS configuration - use public DNS directly
+cat > "$ROOTFS/etc/resolv.conf" <<EOF
+nameserver 8.8.8.8
+nameserver 1.1.1.1
+EOF
+
+# Hostname
+echo "$HOSTNAME" > "$ROOTFS/etc/hostname"
+: > "$ROOTFS/etc/machine-id"
+
+# Create users
+chroot "$ROOTFS" bash -c "adduser --disabled-password --gecos '' debian"
+chroot "$ROOTFS" bash -c 'echo "root:root" | chpasswd'
+chroot "$ROOTFS" bash -c 'echo "debian:debian" | chpasswd'
+
+# Sudo for debian user
+echo "debian ALL=(ALL:ALL) NOPASSWD: ALL" > "$ROOTFS/etc/sudoers.d/debian"
+chmod 440 "$ROOTFS/etc/sudoers.d/debian"
+
+# Step 6: Extract kernel/initrd and create qcow2
+log "[6/6] Creating qcow2 image"
+
+# Extract kernel and initrd
 KERNEL=$(ls "$ROOTFS/boot/vmlinuz-"* 2>/dev/null | sort -V | tail -1)
 INITRD=$(ls "$ROOTFS/boot/initrd.img-"* 2>/dev/null | sort -V | tail -1)
 
-cp "$KERNEL" "$KERNEL_OUT"
-cp "$INITRD" "$INITRD_OUT"
+cp "$KERNEL" "${OUT_DIR}/vmlinuz-virt"
+cp "$INITRD" "${OUT_DIR}/initramfs-virt"
 
-KVER=$(basename "$KERNEL" | sed 's/vmlinuz-//')
-chroot "$ROOTFS" bash -c "
-    dpkg --purge linux-image-arm64 linux-image-${KVER} 2>/dev/null || true
-    rm -rf /boot/*
-" 2>/dev/null || true
+# Create qcow2
+virt-make-fs --type=ext4 --size=8G "$ROOTFS" "$RAW_IMG"
+qemu-img convert -c -f raw -O qcow2 "$RAW_IMG" "$QCOW2"
 
-# Step 6: Cleanup
-log "[6/7] Cleanup"
-chroot "$ROOTFS" bash -c "
-    rm -f /usr/bin/qemu-aarch64-static
-    apt-get autoremove --purge -y 2>/dev/null || true
-    apt-get clean
-    rm -rf /var/lib/apt/lists/* /var/cache/apt/*
-    rm -rf /usr/share/{doc,man,info,locale}/*
-    rm -rf /tmp/* /var/tmp/*
-    find /var/log -type f -delete 2>/dev/null || true
-" 2>/dev/null || true
-
-for mp in proc sys dev/pts dev run; do
-    umount -lf "$ROOTFS/$mp" || true
-done
-
-# Step 7: Create qcow2
-log "[7/7] Building qcow2"
-USED_KB=$(du -sk "$ROOTFS" | cut -f1)
-RAW_MB=$(( (USED_KB * 120 / 100 / 1024) + 64 ))
-
-truncate -s "${RAW_MB}M" "$RAW_IMG"
-mkfs.ext4 -L rootfs -m 1 -F "$RAW_IMG"
-
-mount -o loop "$RAW_IMG" "$MNT"
-rsync -aHAX --numeric-ids \
-    --exclude='/proc/*' --exclude='/sys/*' --exclude='/dev/*' \
-    --exclude='/run/*' --exclude='/tmp/*' \
-    "$ROOTFS/" "$MNT/"
-
-mkdir -p "$MNT"/{proc,sys,dev,run,tmp}
-chmod 1777 "$MNT/tmp"
-sync
-umount "$MNT"
-
-e2fsck -fy "$RAW_IMG" || true
-resize2fs -M "$RAW_IMG"
-
-qemu-img convert -f raw -O qcow2 -c -o compression_type=zlib "$RAW_IMG" "$QCOW2"
-qemu-img resize "$QCOW2" "$VIRTUAL_SIZE"
-
-gzip -9 -c "$QCOW2" > "${QCOW2}.gz"
-rm "$QCOW2"
+# Compress
+gzip -9 "$QCOW2"
 
 log "Build complete"
 ls -lh "$OUT_DIR/"
