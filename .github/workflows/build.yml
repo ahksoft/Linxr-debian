@@ -25,19 +25,22 @@ jobs:
         with:
           platforms: arm64
 
-      - name: Build Debian rootfs
+      - name: Download working Debian rootfs
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p android/app/src/main/assets/vm
-          docker run --rm --privileged \
-            -v $(pwd)/scripts:/scripts \
-            -v $(pwd)/android/app/src/main/assets/vm:/out \
-            -e SUITE=trixie \
-            lazymio/qemu-full:v7.2.8 \
-            bash -c "
-              apt update && apt install -y debootstrap libguestfs-tools qemu-utils
-              bash /scripts/debian_build.sh
-            "
+          cd android/app/src/main/assets/vm
+          
+          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/debian-trixie-arm64.qcow2
+          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/vmlinuz-6.12.73+deb13-arm64
+          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/initrd.img-6.12.73+deb13-arm64
+          
+          mv debian-trixie-arm64.qcow2 base.qcow2
+          mv vmlinuz-6.12.73+deb13-arm64 vmlinuz-virt
+          mv initrd.img-6.12.73+deb13-arm64 initramfs-virt
+          
+          gzip -9 base.qcow2
+          ls -lh
 
       - uses: actions/upload-artifact@v4
         with:
