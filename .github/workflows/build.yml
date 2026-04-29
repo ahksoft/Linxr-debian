@@ -9,6 +9,9 @@ jobs:
   build-qcow2:
     name: Build Debian base image
     runs-on: ubuntu-latest
+    container:
+      image: lazymio/qemu-full:v7.2.8
+      options: --privileged
     steps:
       - uses: actions/checkout@v4
 
@@ -16,31 +19,102 @@ jobs:
         id: cache
         uses: actions/cache@v4
         with:
-          path: android/app/src/main/assets/vm/base.qcow2.gz
-          key: qcow2-debian-trixie-${{ hashFiles('scripts/debian_build.sh') }}
+          path: android/app/src/main/assets/vm
+          key: qcow2-debian-trixie-stubby-${{ hashFiles('.github/workflows/build.yml') }}
 
-      - name: Set up QEMU (for ARM64 emulation)
-        if: steps.cache.outputs.cache-hit != 'true'
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
-      - name: Download working Debian rootfs
+      - name: Mount binfmt_misc
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          mkdir -p android/app/src/main/assets/vm
-          cd android/app/src/main/assets/vm
+          mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+          update-binfmts --display
+          ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --importdir /opt/binfmt_fixed --unimport
+          ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --importdir /opt/binfmt_fixed --import
+          ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --enable
+
+      - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          apt update && apt install -y libguestfs-tools linux-image-generic debootstrap
+
+      - name: Build Debian rootfs
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p mnt android/app/src/main/assets/vm
           
-          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/debian-trixie-arm64.qcow2
-          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/vmlinuz-6.12.73+deb13-arm64
-          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/initrd.img-6.12.73+deb13-arm64
+          # Debootstrap stage 1
+          debootstrap --foreign --arch=arm64 --include=locales trixie mnt/ http://deb.debian.org/debian
           
-          mv debian-trixie-arm64.qcow2 base.qcow2
-          mv vmlinuz-6.12.73+deb13-arm64 vmlinuz-virt
-          mv initrd.img-6.12.73+deb13-arm64 initramfs-virt
+          # Debootstrap stage 2
+          chroot mnt/ /debootstrap/debootstrap --second-stage
           
-          gzip -9 base.qcow2
-          ls -lh
+          # Install kernel
+          echo 'fake /usr ext4 fake 0 1' > mnt/etc/fstab
+          chroot mnt/ apt update
+          chroot mnt/ apt install -y initramfs-tools
+          
+          sed -i 's/MODULES=most/MODULES=list/' mnt/etc/initramfs-tools/initramfs.conf
+          printf "%s\n" virtio_mmio virtio_blk virtio_net virtio_pci ext4 sd_mod >> mnt/etc/initramfs-tools/modules
+          
+          chroot mnt/ apt install -y linux-image-arm64 openssh-server sudo stubby
+          echo '/dev/vda / ext4 errors=remount-ro 0 1' > mnt/etc/fstab
+          
+          # Configure SSH
+          cat > mnt/etc/ssh/sshd_config <<EOF
+          Port 22
+          PermitRootLogin yes
+          PasswordAuthentication yes
+          UsePAM yes
+          EOF
+          
+          # Configure network
+          cat >> mnt/etc/network/interfaces <<EOF
+          
+          auto eth0
+          iface eth0 inet dhcp
+          EOF
+          
+          # Configure DNS-over-TLS with stubby
+          cat > mnt/etc/stubby/stubby.yml <<EOF
+          resolution_type: GETDNS_RESOLUTION_STUB
+          dns_transport_list:
+            - GETDNS_TRANSPORT_TLS
+          tls_authentication: GETDNS_AUTHENTICATION_REQUIRED
+          listen_addresses:
+            - 127.0.0.1@53
+          upstream_recursive_servers:
+            - address_data: 1.1.1.1
+              tls_auth_name: "cloudflare-dns.com"
+            - address_data: 1.0.0.1
+              tls_auth_name: "cloudflare-dns.com"
+          EOF
+          
+          echo "nameserver 127.0.0.1" > mnt/etc/resolv.conf
+          
+          # Configure system
+          echo "linxr-debian" > mnt/etc/hostname
+          : > mnt/etc/machine-id
+          
+          chroot mnt/ bash -c "adduser --disabled-password --gecos '' debian"
+          chroot mnt/ bash -c 'echo "root:root" | chpasswd'
+          chroot mnt/ bash -c 'echo "debian:debian" | chpasswd'
+          echo "debian ALL=(ALL:ALL) NOPASSWD: ALL" > mnt/etc/sudoers.d/debian
+          chmod 440 mnt/etc/sudoers.d/debian
+          
+          # Disable systemd-resolved, enable stubby
+          chroot mnt/ systemctl disable systemd-resolved || true
+          chroot mnt/ systemctl mask systemd-resolved || true
+          chroot mnt/ systemctl enable stubby
+          
+          # Extract kernel and initrd
+          cp mnt/boot/vmlinuz-* android/app/src/main/assets/vm/vmlinuz-virt
+          cp mnt/boot/initrd.img-* android/app/src/main/assets/vm/initramfs-virt
+          
+          # Create qcow2
+          virt-make-fs --type=ext4 --size=8G mnt raw.img
+          qemu-img convert -c -f raw -O qcow2 raw.img android/app/src/main/assets/vm/base.qcow2
+          gzip -9 android/app/src/main/assets/vm/base.qcow2
+          
+          ls -lh android/app/src/main/assets/vm/
 
       - uses: actions/upload-artifact@v4
         with:
