@@ -153,8 +153,8 @@ class VmManager(private val context: Context) {
         cmd += listOf("-device", "virtio-blk-pci,drive=user")
         
         // Network with romfile disabled to avoid "efi-virtio.rom" warning
-        // Use restrict=off to allow SLIRP DNS server to work
-        cmd += listOf("-netdev", "user,id=net0,hostfwd=tcp::2222-:22,dns=8.8.8.8,restrict=off")
+        // Use multiple DNS servers like Termux QEMU does
+        cmd += listOf("-netdev", "user,id=net0,hostfwd=tcp::2222-:22,dns=8.8.8.8,dns=8.8.4.4,dns=1.1.1.1")
         cmd += listOf("-device", "virtio-net-pci,netdev=net0,romfile=")
         
         // Display
