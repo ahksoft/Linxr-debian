@@ -139,14 +139,14 @@ class VmManager(private val context: Context) {
 
         if (isArm64()) {
             cmd += listOf("-machine", "virt")
-            cmd += listOf("-cpu", "cortex-a57")
+            cmd += listOf("-cpu", "cortex-a53")  // Changed to A53 for better compatibility
         } else {
             cmd += listOf("-machine", "q35")
             cmd += listOf("-cpu", "qemu64")
         }
 
         cmd += listOf("-smp", vcpu.toString())
-        cmd += listOf("-m", ramMb.toString())
+        cmd += listOf("-m", "2048")  // Increased to 2GB RAM
         
         // Disk setup: single user.qcow2 (no base overlay for Debian)
         cmd += listOf("-drive", "if=none,file=$userImage,id=user,format=qcow2")

@@ -9,6 +9,9 @@ jobs:
   build-qcow2:
     name: Build Debian base image
     runs-on: ubuntu-latest
+    container:
+      image: lazymio/qemu-full:v7.2.8
+      options: --privileged
     steps:
       - uses: actions/checkout@v4
 
@@ -17,25 +20,29 @@ jobs:
         uses: actions/cache@v4
         with:
           path: android/app/src/main/assets/vm
-          key: qcow2-debian-trixie-v2
+          key: qcow2-debian-bookworm-dnsmasq-a53-v1
 
-      - name: Download pre-built Debian rootfs
+      - name: Mount binfmt_misc
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+          update-binfmts --display
+          ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --importdir /opt/binfmt_fixed --unimport
+          ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --importdir /opt/binfmt_fixed --import
+          ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --enable
+
+      - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          apt update && apt install -y libguestfs-tools linux-image-generic debootstrap
+
+      - name: Build Debian rootfs with DNS fix
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p android/app/src/main/assets/vm
-          cd android/app/src/main/assets/vm
-          
-          # Use your working image
-          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/debian-trixie-arm64.qcow2
-          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/vmlinuz-6.12.73+deb13-arm64
-          wget -q https://github.com/ahksoft/DebianQEMURootfs/releases/download/Arm64_v1/initrd.img-6.12.73+deb13-arm64
-          
-          mv debian-trixie-arm64.qcow2 base.qcow2
-          mv vmlinuz-6.12.73+deb13-arm64 vmlinuz-virt
-          mv initrd.img-6.12.73+deb13-arm64 initramfs-virt
-          
-          gzip -9 base.qcow2
-          ls -lh
+          bash scripts/build_debian_complete.sh
+          mv /out/* android/app/src/main/assets/vm/
+          ls -lh android/app/src/main/assets/vm/
 
       - uses: actions/upload-artifact@v4
         with:
