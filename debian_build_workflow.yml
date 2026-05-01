@@ -1,0 +1,198 @@
+name: Build Debian test Rootfs
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  Build:
+    runs-on: ${{ matrix.config.os }}
+    container:
+      image: ${{ matrix.config.image }}
+      options: --privileged
+    name: ${{ matrix.config.name }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {
+              os: ubuntu-latest,
+              suite: trixie,
+              arch: arm64,
+              qemu-arch: "aarch64",
+              name: "Debian-trixie-arm64",
+              kernel: "linux-image-arm64",
+              artifact: "debian-trixie-arm64",
+              hostname: "debian-trixie-arm64",
+              qcow2: "debian-trixie-arm64.qcow2",
+              rootfs: "debian-trixie-arm64.tar.xz",
+              pool: "http://deb.debian.org/debian",
+              image: "lazymio/qemu-full:v7.2.8",
+              iface: "eth0"
+            }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 🚧 Mount binfmt_misc
+        run: |
+          mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+          update-binfmts --display
+          ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --importdir /opt/binfmt_fixed --unimport
+          ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --importdir /opt/binfmt_fixed --import
+          ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --enable
+          update-binfmts --display
+
+      - name: 🚧 Dependency
+        run: |
+          apt update && apt install libguestfs-tools linux-image-generic debian-ports-archive-keyring aria2 -y
+
+      - name: 🚧 Deboostrap 1st stage
+        run: |
+          mkdir mnt
+          debootstrap --foreign --arch=${{ matrix.config.arch }} --include=locales ${{ matrix.config.suite }} mnt/ ${{ matrix.config.pool }}
+
+      - name: 🚧 Deboostrap 2nd stage
+        run: |
+          chroot mnt/ debootstrap/debootstrap --second-stage
+
+      - name: 🚧 Install Kernel & fstab
+        run: |
+          echo 'fake /usr ext4 fake 0 1' > mnt/etc/fstab
+          chroot mnt/ apt update
+          chroot mnt/ apt install initramfs-tools -y
+
+          sed -i 's/MODULES=most/MODULES=list/' mnt/etc/initramfs-tools/initramfs.conf
+
+          printf "%s\n" \
+          virtio_mmio virtio_blk virtio_net virtio_pci ext4 sd_mod \
+          xhci-pci uhci-hcd ehci-pci \
+          usb-storage uas usbhid usbnet \
+          ax88179_178a r8152 cdc_ether \
+          >> mnt/etc/initramfs-tools/modules
+
+          chroot mnt/ apt update
+          chroot mnt/ apt install ${{ matrix.config.kernel }} -y
+
+          echo '/dev/vda / ext4 errors=remount-ro 0 1' > mnt/etc/fstab
+
+      - name: 🚧 Install SSH + sudo
+        run: |
+          chroot mnt/ apt install openssh-server sudo -y
+
+      - name: 🚧 Configure SSH (Full Access)
+        run: |
+          printf "%s\n" \
+          "Port 22" \
+          "ListenAddress 0.0.0.0" \
+          "ListenAddress ::" \
+          "PermitRootLogin yes" \
+          "PasswordAuthentication yes" \
+          "PubkeyAuthentication yes" \
+          "AllowTcpForwarding yes" \
+          "GatewayPorts yes" \
+          "AllowStreamLocalForwarding yes" \
+          "PermitTunnel yes" \
+          "AllowAgentForwarding yes" \
+          "X11Forwarding yes" \
+          "X11UseLocalhost no" \
+          "UsePAM yes" \
+          > mnt/etc/ssh/sshd_config
+
+      - name: 🚧 Configure Debian
+        run: |
+          echo >> mnt/etc/network/interfaces
+          echo "auto ${{ matrix.config.iface }}" >> mnt/etc/network/interfaces
+          echo "iface ${{ matrix.config.iface }} inet dhcp" >> mnt/etc/network/interfaces
+
+          : > mnt/etc/machine-id
+          echo "${{ matrix.config.hostname }}" > mnt/etc/hostname
+
+          chroot mnt bash -c "adduser --disabled-password --gecos '' debian"
+
+          chroot mnt bash -c 'echo "root:root" | chpasswd'
+          chroot mnt bash -c 'echo "debian:debian" | chpasswd'
+
+          echo "debian ALL=(ALL:ALL) NOPASSWD: ALL" > mnt/etc/sudoers.d/debian
+          chmod 440 mnt/etc/sudoers.d/debian
+
+      - name: 🚧 Fix DNS for QEMU SLIRP (Android compatibility)
+        run: |
+          # Install stubby for DNS-over-TLS (works through SLIRP)
+          chroot mnt/ apt install stubby -y
+          
+          # Configure stubby to use Cloudflare DNS-over-TLS
+          cat > mnt/etc/stubby/stubby.yml <<EOF
+          resolution_type: GETDNS_RESOLUTION_STUB
+          dns_transport_list:
+            - GETDNS_TRANSPORT_TLS
+          tls_authentication: GETDNS_AUTHENTICATION_REQUIRED
+          tls_query_padding_blocksize: 128
+          edns_client_subnet_private: 1
+          idle_timeout: 10000
+          listen_addresses:
+            - 127.0.0.1@53
+          upstream_recursive_servers:
+            - address_data: 1.1.1.1
+              tls_auth_name: "cloudflare-dns.com"
+            - address_data: 1.0.0.1
+              tls_auth_name: "cloudflare-dns.com"
+          EOF
+          
+          # Set resolv.conf to use local stubby
+          cat > mnt/etc/resolv.conf <<EOF
+          nameserver 127.0.0.1
+          options edns0 trust-ad
+          EOF
+          
+          # Disable systemd-resolved (conflicts with stubby)
+          chroot mnt/ systemctl disable systemd-resolved || true
+          chroot mnt/ systemctl mask systemd-resolved || true
+          
+          # Enable stubby service
+          chroot mnt/ systemctl enable stubby
+
+      - name: 📦 Pack qcow2
+        run: |
+          mkdir artifact
+          virt-make-fs --type=ext4 --size=5G mnt raw.img
+          qemu-img convert -c -f raw -O qcow2 raw.img artifact/${{ matrix.config.qcow2 }}
+
+      - name: 📦 Pack Initrd & Kernel
+        run: |
+          cp mnt/boot/vmlinu* ./artifact/
+          cp mnt/boot/initrd.img-* ./artifact/
+
+      - name: 📦 Pack Rootfs
+        run: |
+          tar caf artifact/${{ matrix.config.rootfs }} --one-file-system mnt
+
+      - name: 📤 Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: ./artifact/
+          name: artifact-${{ matrix.config.arch }}
+
+  publish:
+    needs: [Build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: artifact-*
+          path: artifact
+          merge-multiple: true
+
+      - name: 📦 Check artifacts
+        run: |
+          ls -la artifact/
+
+      - name: 📦 Release
+        if: startsWith(github.ref, 'refs/tags')
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
+          files: ./artifact/*

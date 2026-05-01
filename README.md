@@ -1,14 +1,14 @@
 # Linxr
 
-**Bare Alpine Linux VM on Android — no root required.**
+**Bare Debian Linux VM on Android — no root required.**
 
-Linxr runs a full Alpine Linux environment inside a QEMU virtual machine on any Android device. Access it through the built-in SSH terminal or any external SSH client. No root, no container runtimes, no special hardware.
+Linxr runs a full Debian Linux environment inside a QEMU virtual machine on any Android device. Access it through the built-in SSH terminal or any external SSH client. No root, no container runtimes, no special hardware.
 
 ---
 
 ## Features
 
-- **Full Linux shell** — Alpine Linux 3.19 with OpenRC init, OpenSSH, sudo, bash
+- **Full Linux shell** — Debian 12 (Bookworm) with systemd init, OpenSSH, sudo, bash
 - **Built-in terminal** — SSH terminal tab with auto-reconnect
 - **External SSH access** — connect from any SSH client on the same device
 - **No root required** — QEMU runs as a normal Android app process
@@ -44,15 +44,15 @@ Linxr runs a full Alpine Linux environment inside a QEMU virtual machine on any 
 
 1. Install the APK
 2. Open **Linxr** → tap **Start VM**
-3. Wait ~15 seconds for Alpine to boot
+3. Wait ~30 seconds for Debian to boot
 4. Switch to the **Terminal** tab — it auto-connects
-5. Log in as `root` / `alpine`
+5. Log in as `root` / `debian`
 
 ### External SSH (optional)
 
 ```bash
 ssh root@localhost -p 2222
-# password: alpine
+# password: root
 ```
 
 ---
@@ -68,18 +68,18 @@ Android App (Flutter + Kotlin)
 ├── QEMU (libqemu.so)     — aarch64 machine emulation
 │   └── SLIRP networking  — NAT with hostfwd TCP:2222→:22
 │
-└── Alpine Linux VM
-    ├── OpenRC init       — sysinit / boot / default runlevels
-    ├── OpenSSH sshd      — listens on :22 inside the VM
-    ├── Static IP         — 10.0.2.15/24, gw 10.0.2.2, DNS 10.0.2.3
-    └── virtio-blk        — base.qcow2 (read-only) + user.qcow2 (writable)
+└── Debian Linux VM
+    ├── systemd init       — system and service manager
+    ├── OpenSSH sshd       — listens on :22 inside the VM
+    ├── Static IP          — 10.0.2.15/24, gw 10.0.2.2, DNS 10.0.2.3
+    └── virtio-blk         — base.qcow2 (read-only) + user.qcow2 (writable)
 ```
 
 ### Disk layout
 
 | File | Purpose |
 |---|---|
-| `base.qcow2` | Read-only Alpine rootfs (openssh, sudo, bash baked in) |
+| `base.qcow2` | Read-only Debian rootfs (openssh, sudo, bash, systemd baked in) |
 | `user.qcow2` | Writable overlay — your data lives here |
 | `vmlinuz-virt` | Linux 6.6 kernel (virt profile) |
 | `initramfs-virt` | Initial RAM filesystem |
@@ -130,7 +130,7 @@ adb install build/linxr-debug.apk
 | Field | Value |
 |---|---|
 | Username | `root` |
-| Password | `alpine` |
+| Password | `root` |
 
 > Change the root password with `passwd` after first login.
 
@@ -149,7 +149,7 @@ DNS       10.0.2.3  (SLIRP built-in resolver)
 Install packages normally:
 
 ```sh
-apk add curl git python3
+apt update && apt install curl git python3
 ```
 
 ---
@@ -197,7 +197,7 @@ alpine/
 | [xterm](https://pub.dev/packages/xterm) | BSD-3-Clause | Terminal emulator widget |
 | [provider](https://pub.dev/packages/provider) | MIT | State management |
 | [QEMU](https://www.qemu.org) | GPL-2.0 | Machine emulator |
-| [Alpine Linux](https://alpinelinux.org) | MIT / GPL | Guest OS |
+| [Debian Linux](https://www.debian.org) | GPL / MIT | Guest OS |
 | [OpenSSH](https://www.openssh.com) | BSD | SSH server in guest |
 
 ---

@@ -2,15 +2,16 @@ name: Build APK
 
 on:
   push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
+    branches: [main, master, alpine-to-debian]
   workflow_dispatch:
 
 jobs:
   build-qcow2:
-    name: Build Alpine base image
+    name: Build Debian base image
     runs-on: ubuntu-latest
+    container:
+      image: lazymio/qemu-full:v7.2.8
+      options: --privileged
     steps:
       - uses: actions/checkout@v4
 
@@ -18,18 +19,30 @@ jobs:
         id: cache
         uses: actions/cache@v4
         with:
-          path: android/app/src/main/assets/vm/base.qcow2.gz
-          key: qcow2-${{ hashFiles('scripts/_build_rootfs.sh') }}
+          path: android/app/src/main/assets/vm
+          key: qcow2-debian-bookworm-dnsmasq-a53-v1
 
-      - name: Set up QEMU (for ARM64 emulation)
+      - name: Mount binfmt_misc
         if: steps.cache.outputs.cache-hit != 'true'
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
+        run: |
+          mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+          update-binfmts --display
+          ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --importdir /opt/binfmt_fixed --unimport
+          ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --importdir /opt/binfmt_fixed --import
+          ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --enable
 
-      - name: Build base.qcow2.gz
+      - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
-        run: bash scripts/build_qcow2.sh
+        run: |
+          apt update && apt install -y libguestfs-tools linux-image-generic debootstrap
+
+      - name: Build Debian rootfs with DNS fix
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p android/app/src/main/assets/vm
+          bash scripts/build_debian_complete.sh
+          mv /out/* android/app/src/main/assets/vm/
+          ls -lh android/app/src/main/assets/vm/
 
       - uses: actions/upload-artifact@v4
         with:
